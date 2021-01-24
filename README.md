@@ -1,2 +1,2 @@
 # Order Refunds
-Detailed refunds for craft commerce orders
+Detailed refunds for [Craft Commerce](https://craftcms.com/commerce) orders.
