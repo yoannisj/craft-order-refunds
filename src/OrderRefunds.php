@@ -5,7 +5,7 @@
  * Detailed refunds for Craft Commerce orders
  *
  * @author Yoannis Jamar
- * @copyright Copyright (c) 2017 Yoannis Jamar
+ * @copyright Copyright (c) 2021 Yoannis Jamar
  * @link https://github.com/yoannisj
  * @package craft-order-refunds
  */
@@ -22,6 +22,8 @@ use yoannisj\orderrefunds\services\Refunds;
 
 /**
  * OrderRefunds Craft Plugin class
+ * 
+ * @property \yoannisj\orderrefunds\services\Refunds $refunds
  * 
  * @since 0.1.0
  */
@@ -53,6 +55,11 @@ class OrderRefunds extends Plugin
         // add static reference to plugin's singleton instance
         self::$plugin = $this;
 
+        // register service components
+        $this->setComponents([
+            'refunds' => Refunds::class,
+        ]);
+
         $request = Craft::$app->getRequest();
         $response = Craft::$app->getResponse();
 
@@ -73,6 +80,17 @@ class OrderRefunds extends Plugin
         Craft::info(Craft::t('order-refunds', '{name} plugin initialized', [
             'name' => $this->name
         ]), __METHOD__);
+    }
+
+    /**
+     * Getter for plugin's `refunds` service component
+     * 
+     * @return Refunds
+     */
+
+    public function getRefunds(): Refunds
+    {
+        return $this->get('refunds');
     }
 
     // Protected Methods
