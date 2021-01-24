@@ -27,7 +27,7 @@
     label: "Refund Reference Template" | t,
     instructions: ("Template string used to generate a unique reference for each refund."
         ~ " Output refund properties within `{}` signs. For example: `{example}`") | t(params={
-            example: "Refund #{dateCreated|date('ymdHi')}",
+            example: "Refund #{transactionDate|date('ymdHi')}",
         }),
     name: 'refundReferenceTemplate',
     value: settings.refundReferenceTemplate,

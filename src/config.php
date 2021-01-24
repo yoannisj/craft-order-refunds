@@ -20,14 +20,14 @@ return [
 
     /**
      * Template string used to generate a unique reference for each refund.
-     * Output refund properties within `{}` signs. For example: "Refund #{dateCreated|date('ymdHi')}"
+     * Output refund properties within `{}` signs. For example: "Refund #{transactionDate|date('ymdHi')}"
      * 
      * @type string
-     * @default "#{{ seq('refund:' ~ dateCreated|date('ym'), 4) }}"
+     * @default "#{{ seq('refund:' ~ transactionDate|date('ym'), 4) }}"
      * 
      * @since 0.1.0
      */
 
-    'refundReferenceTemplate' => "Refund #{{ seq('refund:' ~ dateCreated|date('ym'), 4) }}",
+    'refundReferenceTemplate' => "Refund #{{ seq('refund:' ~ transactionDate|date('ym'), 4) }}",
 
 ];
