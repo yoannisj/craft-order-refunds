@@ -12,8 +12,11 @@
 
 namespace yoannisj\orderrefunds;
 
+use yii\base\Event;
+
 use Craft;
 use craft\base\Plugin;
+use craft\services\Plugins;
 
 use yoannisj\orderrefunds\services\Refunds;
 
@@ -50,6 +53,23 @@ class OrderRefunds extends Plugin
         // add static reference to plugin's singleton instance
         self::$plugin = $this;
 
+        $request = Craft::$app->getRequest();
+        $response = Craft::$app->getResponse();
+
+        // Redirect to plugin settings after installation
+        Event::on(
+            Plugins::class,
+            Plugins::EVENT_AFTER_INSTALL_PLUGIN,
+            function(PluginEvent $event) use ($request)
+            {
+                if ($event->plugin === $this && $request->getIsCpRequest())
+                {
+                    $response->redirect(UrlHelper::cpUrl('settings/plugins/order-refunds'));
+                    return Craft::$app->end();
+                }
+            }
+        );
+
         Craft::info(Craft::t('order-refunds', '{name} plugin initialized', [
             'name' => $this->name
         ]), __METHOD__);
@@ -67,4 +87,15 @@ class OrderRefunds extends Plugin
         return new Settings();
     }
 
+    /**
+     * @inheritdoc
+     */
+
+    protected function settingsHtml(): string
+    {
+        return Craft::$app->getView()->renderTemplate(
+            'order-refunds/settings',
+            [ 'settings' => $this->getSettings(), ]
+        );
+    }
 }

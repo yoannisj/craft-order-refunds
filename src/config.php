@@ -10,21 +10,24 @@
  * @package craft-order-refunds
  */
 
+/**
+ * Config values for craft's Order Refunds plugin
+ * 
+ * @since 0.1.0
+ */
 
 return [
 
     /**
-     * Template used to create the order refund reference string
-     * 
-     * Properties of \yoannisj\orderrefunds\models\Refund can be output within
-     * `{}` signs. For example: "#{seq('refund:' ~ dateCreated|date('ym'), 4)}"
+     * Template string used to generate a unique reference for each refund.
+     * Output refund properties within `{}` signs. For example: "Refund #{dateCreated|date('ymdHi')}"
      * 
      * @type string
-     * @default "Refund #{dateCreated|date('ymdHi')}"
+     * @default "#{{ seq('refund:' ~ dateCreated|date('ym'), 4) }}"
      * 
      * @since 0.1.0
      */
 
-    'refundReferenceTemplate' => "Refund #{seq('refund:' ~ dateCreated|date('ym'), 4)}",
+    'refundReferenceTemplate' => "Refund #{{ seq('refund:' ~ dateCreated|date('ym'), 4) }}",
 
 ];

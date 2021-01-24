@@ -1,0 +1,34 @@
+{##
+ # Order Refunds plugin for Craft CMS 3.x
+ #
+ # Detailed refunds for Craft Commerce orders
+ #
+ # @author Yoannis Jamar
+ # @copyright Copyright (c) 2017 Yoannis Jamar
+ # @link https://github.com/yoannisj
+ # @package craft-order-refunds
+ #
+ #}
+
+{##
+ # Template 'order-refunds/settings'
+ #
+ # @var craft \craft\web\twig\variables\CraftVariable
+ # @var settings \yoannijs\orderrefunds\models\Settings
+ #
+ # @since 0.1.0
+ #}
+
+{% import "_includes/forms" as forms %}
+
+<h2>Order Refunds</h2>
+
+{{ forms.textField({
+    label: "Refund Reference Template" | t,
+    instructions: ("Template string used to generate a unique reference for each refund."
+        ~ " Output refund properties within `{}` signs. For example: `{example}`") | t(params={
+            example: "Refund #{dateCreated|date('ymdHi')}",
+        }),
+    name: 'refundReferenceTemplate',
+    value: settings.refundReferenceTemplate,
+}) }}

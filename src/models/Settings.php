@@ -25,7 +25,6 @@ class Settings extends Model
 {
     /**
      * @var string
-     * @since 0.1.0
      */
 
     public $refundReferenceTemplate = "Refund #{seq('refund:' ~ dateCreated|date('ym'), 4)}";
