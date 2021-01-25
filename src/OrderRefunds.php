@@ -17,6 +17,7 @@ use yii\base\Event;
 use Craft;
 use craft\base\Plugin;
 use craft\services\Plugins;
+use craft\web\twig\variables\CraftVariable;
 
 use yoannisj\orderrefunds\services\Refunds;
 
@@ -55,13 +56,36 @@ class OrderRefunds extends Plugin
         // add static reference to plugin's singleton instance
         self::$plugin = $this;
 
-        // register service components
+        // Register service components to plugin class
         $this->setComponents([
             'refunds' => Refunds::class,
         ]);
 
         $request = Craft::$app->getRequest();
         $response = Craft::$app->getResponse();
+
+        // Register template root
+        Event::on(
+            View::class,
+            View::EVENT_REGISTER_CP_TEMPLATE_ROOTS,
+            function (RegisterTemplateRootsEvent $event)
+            {
+                $event->roots['order-refunds'] = __DIR__.'/templates';
+            }
+        );
+
+        // Extend craft's twig variable
+        Event::on(
+            CraftVariable::class,
+            CraftVariable::EVENT_INIT,
+            function(Event $event)
+            {
+                /** @var CraftVariable $variable */
+                $variable = $event->sender;
+
+                $variable->set('orderRefunds', OrderRefundsVariable::class);
+            }
+        );
 
         // Redirect to plugin settings after installation
         Event::on(

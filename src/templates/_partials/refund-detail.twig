@@ -1,0 +1,77 @@
+{##
+ # Order Refunds plugin for Craft CMS 3.x
+ #
+ # Detailed refunds for Craft Commerce orders
+ #
+ # @author Yoannis Jamar
+ # @copyright Copyright (c) 2017 Yoannis Jamar
+ # @link https://github.com/yoannisj
+ # @package craft-order-refunds
+ #
+ #}
+
+{##
+ # Template 'order-refunds/_partials/order-detail'
+ #
+ # @var {\craft\commerce\elements\Order} order
+ # @var {\yoannisj\orderrefunds\models\Refund} refund
+ #
+ # @since 0.1.0
+ #}
+
+{% import "_includes/forms" as forms %}
+
+{% set includesAllLineItems = refund.getIncludesAllLineItems() %}
+{% set includesShipping = refund.getIncludesShipping() %}
+{% set lineItemsTableData = craft.orderRefunds.getRefundDetailLineItemsTableData(refund) %}
+{% set hasLineItems = (lineItemsTableData is not empty) %}
+{% set transactionNote = refund.getTransactionNote() %}
+
+<div class="refund-detail">
+
+    <div class="refund-header flex">
+        <h3 class="refund-detail-reference">{{ refund.reference }}</h3>
+        <small class="refund-detail-date extralight">{{ refund.transactionDate|date('Y/m/d H:i') }}</small>
+        <strong class="refund-detail-total">{{ refund.totalPrice | currency(refund.paymentCurrency) }}</strong>
+    </div>
+
+    <div class="refund-options flex">
+        <div class="refund-detail-allitems">
+            {{ forms.lightswitchField({
+                label: 'Includes all line items' | t('order-refunds'),
+                on: includesAllLineItems,
+                disabled: true,
+            }) }}
+        </div>
+
+        <div class="refund-detail-shipping">
+            {{ forms.lightswitchField({
+                label: 'Includes shipping' | t('order-refunds'),
+                on: includesAllLineItems,
+                disabled: true,
+            }) }}
+        </div>
+    </div>
+
+    {% if hasLineItems %}
+        <div class="refund-items">
+            {% if lineItemsTableData is not empty %}
+                {{ forms.editableTableField({
+                    label: 'Line items',
+                    cols: lineItemsTableData.cols,
+                    rows: lineItemsTableData.rows,
+                    static: true,
+                }) }}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="refund-note">
+        {{ forms.textField({
+            label: 'Transaction note' | t('order-refunds'),
+            value: transactionNote,
+            readonly: true,
+        }) }}
+    </div>
+
+</div>

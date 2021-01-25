@@ -258,6 +258,7 @@ class Refund extends Model
         $fields = parent::fields();
 
         $fields[] = 'transactionDate';
+        $fields[] = 'paymentCurrency';
         $fields[] = 'orderId';
         $fields[] = 'lineItems';
         $fields[] = 'totalQty';
@@ -312,6 +313,16 @@ class Refund extends Model
         $transaction = $this->getTransaction();
         // return date of creation since transactions can not be updated
         return ($transaction ? $transaction->dateCreated : null);
+    }
+
+    /**
+     * @return string | null
+     */
+
+    public function getPaymentCurrency()
+    {
+        $transaction = $this->getTransaction();
+        return $transaction ? $transaction->paymentCurrency : null;
     }
 
     /**
