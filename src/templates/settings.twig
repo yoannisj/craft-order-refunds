@@ -23,11 +23,13 @@
 
 <h2>Order Refunds</h2>
 
+{% set referenceTemplateExample = "`{transactionDate|date('ymdHi')}`" %}
+
 {{ forms.textField({
     label: "Refund Reference Template" | t,
     instructions: ("Template string used to generate a unique reference for each refund."
-        ~ " Output refund properties within `{}` signs. For example: `{example}`") | t(params={
-            example: "Refund #{transactionDate|date('ymdHi')}",
+        ~ "\nOutput refund properties within `{}` signs, for example: `{example}`") | t(params={
+            example: referenceTemplateExample,
         }),
     name: 'refundReferenceTemplate',
     value: settings.refundReferenceTemplate,
