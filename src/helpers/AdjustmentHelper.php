@@ -138,9 +138,6 @@ class AdjustmentHelper
 
         foreach ($adjustments as $adjustment)
         {
-            // optionally filter adjustments for given line item
-            if ($lineItemId && $adjustment->lineItemId != $lineItemId) continue;
-
             $isIncluded = $adjustment->included;
             $isTax = ($adjustment->type == 'tax');
 
@@ -151,3 +148,4 @@ class AdjustmentHelper
 
         return $nonIncludedAmount - ($taxAmount + $includedTaxAmount);
     }
+}

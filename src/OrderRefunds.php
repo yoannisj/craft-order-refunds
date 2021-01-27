@@ -17,9 +17,15 @@ use yii\base\Event;
 use Craft;
 use craft\base\Plugin;
 use craft\services\Plugins;
+use craft\events\PluginEvent;
+use craft\events\RegisterTemplateRootsEvent;
+use craft\web\View;
 use craft\web\twig\variables\CraftVariable;
+use craft\helpers\UrlHelper;
 
+use yoannisj\orderrefunds\models\Settings;
 use yoannisj\orderrefunds\services\Refunds;
+use yoannisj\orderrefunds\variables\OrderRefundsVariable;
 
 /**
  * OrderRefunds Craft Plugin class
@@ -31,6 +37,15 @@ use yoannisj\orderrefunds\services\Refunds;
 
 class OrderRefunds extends Plugin
 {
+    // =Static
+    // =========================================================================
+
+    /**
+     * Name of database table used to store order Refund records
+     */
+
+    const TABLE_REFUNDS = "{{%orderrefunds_refunds}}";
+
     // =Properties
     // =========================================================================
 
@@ -82,7 +97,6 @@ class OrderRefunds extends Plugin
             {
                 /** @var CraftVariable $variable */
                 $variable = $event->sender;
-
                 $variable->set('orderRefunds', OrderRefundsVariable::class);
             }
         );
@@ -91,7 +105,7 @@ class OrderRefunds extends Plugin
         Event::on(
             Plugins::class,
             Plugins::EVENT_AFTER_INSTALL_PLUGIN,
-            function(PluginEvent $event) use ($request)
+            function (PluginEvent $event) use ($request, $response)
             {
                 if ($event->plugin === $this && $request->getIsCpRequest())
                 {

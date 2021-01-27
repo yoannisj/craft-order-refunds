@@ -16,6 +16,7 @@ use yii\validators\InlineValidator;
 
 use Craft;
 use craft\base\Model;
+use craft\validators\ArrayValidator;
 
 use craft\commerce\Plugin as Commerce;
 use craft\commerce\models\Transaction;
@@ -44,7 +45,7 @@ class Refund extends Model
     // =========================================================================
 
     /**
-     * @var int
+     * @var integer
      */
 
     public $id;
@@ -56,7 +57,7 @@ class Refund extends Model
     public $reference;
 
     /**
-     * @var int
+     * @var integer
      */
 
     public $transactionId;
@@ -227,7 +228,7 @@ class Refund extends Model
         $rules['attrRequired'] = [ ['transactionId', 'reference'], 'required' ];
 
         $rules['attrBoolean'] = [ ['includesAllLineItems', 'includesShipping'], 'boolean' ];
-        $rules['attrArray'] = [ ['lineItemsData'], 'array' ];
+        $rules['attrArray'] = [ ['lineItemsData'], ArrayValidator::class ];
         $rules['attrId'] = [ ['transactionId'], 'integer', 'min' => 1 ];
 
         $rules['transactionIdRefund'] = [
@@ -266,11 +267,12 @@ class Refund extends Model
 
         $fields[] = 'adjustments';
         $fields[] = 'orderAdjustments';
-
-        $fields[] = 'total';
         $fields[] = 'totalShippingCost';
         $fields[] = 'totalTax';
         $fields[] = 'totalTaxIncluded';
+        $fields[] = 'adjustmentsTotal';
+
+        $fields[] = 'total';
 
         return $fields;
     }
@@ -361,12 +363,12 @@ class Refund extends Model
     }
 
     /**
-     * @return int
+     * @return float
      * 
      * Returns the total number of items covered by the refund
      */
 
-    public function getTotalQty(): int
+    public function getTotalQty(): float
     {
         $totalQty = 0;
 
@@ -380,10 +382,10 @@ class Refund extends Model
     /**
      * Returns the subtotal of line items covered by the refund
      * 
-     * @return int
+     * @return float
      */
 
-    public function getItemSubtotal(): int
+    public function getItemSubtotal(): float
     {
         $subtotal = 0;
 
@@ -415,7 +417,7 @@ class Refund extends Model
      * @return \craft\commerce\models\OrderAdjustment[]
      */
 
-    public function getOrderAjustments(): array
+    public function getOrderAdjustments(): array
     {
         $adjustments = $this->getAdjustments();
         $orderAdjustments = [];
@@ -433,10 +435,10 @@ class Refund extends Model
     /**
      * Returns total shipping cost covered by the refund
      * 
-     * @return int
+     * @return float
      */
 
-    public function getTotalShippingCost(): int
+    public function getTotalShippingCost(): float
     {
         return 0;
     }
@@ -444,10 +446,10 @@ class Refund extends Model
     /**
      * Returns total tax amount covered by the refund
      * 
-     * @return int
+     * @return float
      */
 
-    public function getTotalTax(): int
+    public function getTotalTax(): float
     {
         return 0;   
     }
@@ -455,12 +457,30 @@ class Refund extends Model
     /**
      * Returns total included tax amount covered by the refund
      * 
-     * @return int
+     * @return float
      */
 
-    public function getTotalTaxIncluded(): int
+    public function getTotalTaxIncluded(): float
     {
         return 0;
+    }
+
+    /**
+     * @return float
+     */
+
+    public function getAdjustmentsTotal(): float
+    {
+        return 0;
+    }
+
+    /**
+     * @return float
+     */
+
+    public function getTotal(): float
+    {
+        return $this->getItemSubtotal() + $this->getAdjustmentsTotal();
     }
 
     // =Protected Methods
@@ -475,13 +495,12 @@ class Refund extends Model
         $order = $this->getOrder();
         if (!$order) return [];
 
-        $orderLineItems = $order->getLineItems();
         $includesAllItems = $this->getIncludesAllLineItems();
         $lineItemsData = $this->getLineItemsData();
 
         $lineItems = [];
 
-        foreach ($orderLineItems as $orderLineItem)
+        foreach ($order->getLineItems() as $lineItem)
         {
             $refundQty = ($includesAllItems ? $orderLineItem->qty :
                 ($lineItemsData[$lineItem->id]['qty'] ?? 0));
@@ -489,7 +508,7 @@ class Refund extends Model
             // leave out line items that are not included by refund
             if ($refundQty <= 0) continue;
 
-            $config = $orderLineItem->getAttributes();
+            $config = $lineItem->getAttributes();
             $config['qty'] = $refundQty;
 
             $lineItems[] = new RefundLineItem($config);
@@ -509,9 +528,9 @@ class Refund extends Model
 
         $orderAdjustments = $order->getAdjustments();
 
-        $includesAllItems = $refund->getIncludesAllLineItems();
-        $lineItemsData = $refund->getLineItemsData();
-        $includesShipping = $refund->getIncludesShipping();
+        $includesAllItems = $this->getIncludesAllLineItems();
+        $lineItemsData = $this->getLineItemsData();
+        $includesShipping = $this->getIncludesShipping();
 
         $refundAdjustments = [];
 
@@ -541,6 +560,9 @@ class Refund extends Model
             // quantify line item adjustments per the refunded quantity
             if (!$includesAllItems && $adjustment->lineItemId)
             {
+                $lineItem = $adjustment->getLineItem();
+                if (!$lineItem) continue; // no line item, no adjustment
+
                 $refundQty = $lineItemsData[$lineItem->id]['qty'] ?? 0;
                 $refundAdjustment = AdjustmentHelper::quantifyLineItemAdjustment($refundAdjustment, $refundQty);
 
@@ -619,7 +641,7 @@ class Refund extends Model
 
         // re-caclulate and include order-level tax adjustments that apply
         // to the order price + shipping cost
-        foreach ($adjustments as $adjustment)
+        foreach ($orderAdjustments as $adjustment)
         {
             if ($adjustment->lineItemId) continue;
 
@@ -647,7 +669,7 @@ class Refund extends Model
                 $refundAdjustment->amount = $taxableAmount * $taxRate;
             }
 
-            $refundAdjustments[] = $refundAjustment;
+            $refundAdjustments[] = $refundAdjustment;
         }
 
         return $refundAdjustments;

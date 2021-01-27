@@ -17,6 +17,8 @@ use yoannisj\orderrefunds\models\Refund;
 
 /**
  * Class for Refund event objects
+ * 
+ * @since 0.1.0
  */
 
 class RefundEvent extends Event

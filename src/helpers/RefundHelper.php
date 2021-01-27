@@ -10,6 +10,8 @@
  * @package craft-order-refunds
  */
 
+namespace yoannisj\orderrefunds\helpers;
+
 use Craft;
 use craft\helpers\ArrayHelper;
 
