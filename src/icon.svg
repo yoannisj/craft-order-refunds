@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256px" height="256px" viewBox="0 0 256 256" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>icon</title>
+    <g id="icon" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <circle id="background" fill="#FFEEA5" cx="136" cy="132" r="120"></circle>
+        <g id="arrow" transform="translate(44.000000, 26.000000)" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="6">
+            <path d="M0,112 C0,162.810197 41.189803,204 92,204 C142.810197,204 184,162.810197 184,112 C184,61.189803 142.810197,20 92,20" id="Path"></path>
+            <polyline id="Path" transform="translate(107.000000, 20.000000) rotate(-315.000000) translate(-107.000000, -20.000000) " points="121 34 95.1213203 31.8786797 93 6"></polyline>
+        </g>
+        <g id="package" transform="translate(87.000000, 100.000000)" stroke="#000000" stroke-linejoin="round" stroke-width="6">
+            <rect id="box" x="0" y="0" width="103" height="77"></rect>
+            <rect id="tape" fill="#FFFFFF" x="39" y="0" width="25" height="39"></rect>
+        </g>
+        <g id="coin" transform="translate(14.000000, 18.000000)">
+            <circle id="thickness" fill="#000000" cx="56" cy="55" r="54"></circle>
+            <circle id="shape" stroke="#000000" stroke-width="5" fill="#FFFFFF" cx="51.5" cy="51.5" r="51.5"></circle>
+            <path d="M53.712381,79 L53.712381,73.8125 C62.2457143,73 67,68 67,61 C67,54.125 63.16,50.125 55.3580952,48.25 L53.712381,47.875 L53.712381,36 C57.1257143,36.8125 58.832381,39.25 59.0152381,42.625 L66.2685714,42.625 C66.207619,35.3125 61.4533333,30.125 53.712381,29.1875 L53.712381,24 L48.7752381,24 L48.7752381,29.1875 C40.7904762,30 36.4019048,35 36.4019048,41.375 C36.4019048,48.5625 40.3028571,51.8125 47.6780952,53.5625 L48.7752381,53.8125 L48.7752381,67.1875 C44.8133333,66.4375 42.4971429,63.8125 42.2533333,59.4375 L35,59.4375 C35.2438095,67.5 39.8761905,73.0625 48.7752381,73.8125 L48.7752381,79 L53.712381,79 Z M48.7752381,46.6875 C45.3619048,45.6875 43.7771429,44.1875 43.7771429,41.375 C43.7771429,38.5 45.6057143,36.5 48.7752381,35.875 L48.7752381,46.6875 Z M53.712381,67.1875 L53.712381,55 C57.6133333,55.9375 59.6247619,57.6875 59.6247619,61.125 C59.6247619,64.4375 57.6133333,66.5625 53.712381,67.1875 Z" id="currency" fill="#000000" fill-rule="nonzero"></path>
+        </g>
+    </g>
+</svg>
