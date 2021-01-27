@@ -23,11 +23,11 @@ return [
      * Output refund properties within `{}` signs. For example: "Refund #{transactionDate|date('ymdHi')}"
      * 
      * @type string
-     * @default "#{{ seq('refund:' ~ transactionDate|date('ym'), 4) }}"
+     * @default "Refund #{transactionDate|date('ym')}-{seq('refund:' ~ transactionDate|date('ym'), 4)}"
      * 
      * @since 0.1.0
      */
 
-    'refundReferenceTemplate' => "Refund #{{ seq('refund:' ~ transactionDate|date('ym'), 4) }}",
+    'refundReferenceTemplate' => "Refund #{transactionDate|date('ym')}-{seq('refund:' ~ transactionDate|date('ym'), 4)}",
 
 ];
