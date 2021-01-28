@@ -31,7 +31,7 @@ class AdjustmentHelper
 {
     /**
      * @param OrderAdjustment $adjustment
-     * @param integer $quantity 
+     * @param int $quantity 
      * 
      * @return OrderAdjustment|null
      * 

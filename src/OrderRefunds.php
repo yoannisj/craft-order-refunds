@@ -22,10 +22,12 @@ use craft\events\RegisterTemplateRootsEvent;
 use craft\web\View;
 use craft\web\twig\variables\CraftVariable;
 use craft\helpers\UrlHelper;
+use craft\helpers\Json as JsonHelper;
 
 use yoannisj\orderrefunds\models\Settings;
 use yoannisj\orderrefunds\services\Refunds;
 use yoannisj\orderrefunds\variables\OrderRefundsVariable;
+use yoannisj\orderrefunds\assets\RefundsEditorBundle;
 
 /**
  * OrderRefunds Craft Plugin class
@@ -115,6 +117,12 @@ class OrderRefunds extends Plugin
             }
         );
 
+        // Load order refunds on Order edit screen
+        Craft::$app->getView()->hook(
+            'cp.commerce.order.edit.main-pane',
+            [ $this, 'getRefundsEditorHtml' ]
+        );
+
         Craft::info(Craft::t('order-refunds', '{name} plugin initialized', [
             'name' => $this->name
         ]), __METHOD__);
@@ -129,6 +137,38 @@ class OrderRefunds extends Plugin
     public function getRefunds(): Refunds
     {
         return $this->get('refunds');
+    }
+
+    /**
+     * Registers assets and returns html for the refunds edit UI
+     * 
+     * @return string|null
+     */
+
+    public function getRefundsEditorHtml( array &$context )
+    {
+        $order = $context['order'] ?? null;
+        if (!$order) return '';
+
+        $view = Craft::$app->getView();
+
+        // register assets bundle
+        $view->registerAssetBundle(RefundsEditorBundle::class);
+
+        // render html for edit UI
+        $html = $view->renderTemplate('order-refunds/refunds-editor', [
+            'order' => $order
+        ]);
+
+        // register js to initialize edit UI
+        $jsOptions = [
+            'orderId' => $order->id,
+        ];
+
+        $view->registerJs('new RefundsEditor("#transactionsTab", '
+            . JsonHelper::encode($jsOptions).')');
+
+        return $html;
     }
 
     // Protected Methods

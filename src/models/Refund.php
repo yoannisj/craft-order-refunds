@@ -148,8 +148,8 @@ class Refund extends Model
         $this->_includesAllLineItems = $value;
 
         // force re-calculation of computed properties that are affected
-        unset($this->_lineItems);
-        unset($this->_adjustments);
+        $this->_lineItems = null;
+        $this->_adjustments = null;
     }
 
     /**
@@ -174,8 +174,8 @@ class Refund extends Model
         $this->_lineItemsData = $value;
 
         // force re-calculation of computed properties that are affected
-        unset($this->_lineItems);
-        unset($this->_adjustments);
+        $this->_lineItems = null;
+        $this->_adjustments = null;
     }
 
     /**
@@ -200,7 +200,7 @@ class Refund extends Model
         $this->_includesShipping = $value;
 
         // force re-calculation of computed properties that are affected
-        unset($this->_adjustments);
+        $this->_adjustments = null;
     }
 
     /**
@@ -261,6 +261,8 @@ class Refund extends Model
         $fields[] = 'transactionDate';
         $fields[] = 'paymentCurrency';
         $fields[] = 'orderId';
+        $fields[] = 'transactionNote';
+
         $fields[] = 'lineItems';
         $fields[] = 'totalQty';
         $fields[] = 'itemSubtotal';
@@ -273,6 +275,7 @@ class Refund extends Model
         $fields[] = 'adjustmentsTotal';
 
         $fields[] = 'total';
+        $fields[] = 'totalPrice';
 
         return $fields;
     }
@@ -328,6 +331,16 @@ class Refund extends Model
     }
 
     /**
+     * @return string | null
+     */
+
+    public function getTransactionNote()
+    {
+        $transaction = $this->getTransaction();
+        return $transaction ? $transaction->note : null;
+    }
+
+    /**
      * @return \craft\commerce\elements\Order | null
      */
 
@@ -338,7 +351,7 @@ class Refund extends Model
     }
 
     /**
-     * @return integer | null
+     * @return int | null
      */
 
     public function getOrderId()
@@ -481,6 +494,15 @@ class Refund extends Model
     public function getTotal(): float
     {
         return $this->getItemSubtotal() + $this->getAdjustmentsTotal();
+    }
+
+    /**
+     * @return float
+     */
+
+    public function getTotalPrice(): float
+    {
+        return $this->getTotal();
     }
 
     // =Protected Methods

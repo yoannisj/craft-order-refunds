@@ -14,6 +14,7 @@ namespace yoannisj\orderrefunds\records;
 
 use Craft;
 use craft\db\ActiveRecord;
+use craft\helpers\Json as JsonHelper;
 
 use craft\commerce\elements\Order;
 
@@ -51,8 +52,36 @@ class RefundRecord extends ActiveRecord
     // =Properties
     // =========================================================================
 
+    /**
+     * @var array
+     */
+
+    private $_lineItemsData;
+
     // =Public Methods
     // =========================================================================
+
+    // =Magic
+    // -------------------------------------------------------------------------
+    /**
+     * @inheritdoc
+     */
+
+    public function __get( $name )
+    {
+        $value = parent::__get($name);
+
+        if ($name == 'lineItemsData' && !is_array($value))
+        {
+            $value = $value = JsonHelper::decodeIfJson($value) ?? [];
+            $this->setAttribute($name, $value);
+        }
+
+        return $value;
+    }
+
+    // =Attributes
+    // -------------------------------------------------------------------------
 
     // =Protected Methods
     // =========================================================================

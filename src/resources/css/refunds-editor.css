@@ -1,0 +1,112 @@
+/**
+ * Stylesheet for refund detail rendered on the Order edit page
+ */
+
+/* hide craft commerce's default refund fields */
+#transactions-vue-admin-table #amount,
+#transactions-vue-admin-table #note,
+#transactions-vue-admin-table [data-action="commerce/orders/transaction-refund"] {
+  display: none !important;
+}
+
+.order-refunds {
+  margin-top: 30px;
+}
+
+.order-refund {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.refund-header { width: 25%; }
+.refund-detail { width: 75%; }
+
+.refund-header,
+.refund-transaction,
+.refund-options,
+.refund-items,
+.refund-note {
+  margin-bottom: 10px;
+  padding: 10px 0;
+}
+
+.refund-reference,
+.refund-date {
+  margin: 0 20px 7px 0;
+}
+
+.refund-options {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.refund-allitems,
+.refund-shipping {
+  flex-basis: 50%;
+  margin-left: -7px;
+  margin-right: -7px;
+  margin-bottom: 7px;
+}
+
+.refund-allitems .field,
+.refund-shipping .field {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  margin: 5px 0;
+  padding: 0 7px;
+}
+
+.refund-allitems .heading,
+.refund-shipping .heading {
+  order: 2;
+  margin: 0;
+  flex: 0 1 auto;
+  justify-content: flex-start;
+} 
+
+.refund-allitems .input,
+.refund-shipping .input {
+  order: 1;
+  flex: 0 0 45px;
+}
+
+.refund-item-description,
+.refund-item-saleprice,
+.refund-item-subtotal {
+  padding: 7px 10px !important;
+}
+
+.refund-item-description {
+  text-align: left !important;
+}
+
+.refund-item-saleprice,
+.refund-item-subtotal {
+  text-align: right !important;
+}
+
+.refund-item-qty {
+  width: 120px;
+  padding: 0 !important;
+  white-space: nowrap;
+}
+
+.refund-item-qty input {
+  display: inline-block !important;
+  width: auto !important;
+}
+
+.refund-footer {
+  padding-top: 20px;
+  border-top: 1px solid rgba(51, 64, 77, 0.1);
+}
+
+.refund-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0;
+  font-size: 16px;
+  font-weight: bold;
+}

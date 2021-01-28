@@ -61,7 +61,7 @@ class RefundHelper
 
         foreach ($order->getTransactions() as $transaction)
         {
-            if ($transaction->canRefund) {
+            if ($transaction->canRefund()) {
                 $transactions[] = $transaction;
             }
         }
@@ -85,10 +85,12 @@ class RefundHelper
 
         $quantities = [];
 
+        foreach ($lineItems as $lineItem) {
+            $quantities[$lineItem->id] = $lineItem->qty;
+        }
+
         foreach ($refunds as $refund)
         {
-            $refundLineItems = $refund->getLineItems();
-
             foreach ($refund->getLineItems() as $refundItem)
             {
                 $lineItemId = $refundItem->id;
@@ -97,7 +99,12 @@ class RefundHelper
                 if (!$lineItem) continue;
 
                 $refundableQty = $lineItem->qty - $refundItem->qty;
-                $quantities[$lineItemId] = $refundableQty;
+
+                if ($refundableQty <= 0) {
+                    unset($quantities[$lineItemId]);
+                } else {
+                    $quantities[$lineItemId] = $refundableQty;
+                }
             }
         }
 

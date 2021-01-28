@@ -10,16 +10,22 @@
  * @package craft-order-refunds
  */
 
+namespace yoannisj\orderrefunds\services;
+
 use yii\base\Component;
 use yii\base\InvalidArgumentException;
 
 use Craft;
+use craft\helpers\ArrayHelper;
 
+use craft\commerce\Plugin as Commerce;
 use craft\commerce\elements\Order;
 
 use yoannisj\orderrefunds\OrderRefunds;
 use yoannisj\orderrefunds\models\Refund;
+use yoannisj\orderrefunds\records\RefundRecord;
 use yoannisj\orderrefunds\events\RefundEvent;
+use yoannisj\orderrefunds\helpers\RefundHelper;
 
 /**
  * Service component implementing CRUD operations for Refund models
@@ -58,34 +64,40 @@ class Refunds extends Component
 
     public function getRefundsForOrder( Order $order ): array
     {
-        return $this->getRefundsForOrderId($order->id);
+        if (!array_key_exists($order->id, $this->_refundsByOrderId))
+        {
+            $transactions = RefundHelper::getRefundTransactions($order);
+            $transactionIds = ArrayHelper::getColumn($transactions, 'id');
+
+            $refunds = [];
+            $records = RefundRecord::findAll([
+                'transactionId' => $transactionIds
+            ]);
+    
+            foreach ($records as $record) {
+                $refunds[] = new Refund($record->getAttributes());
+            }
+    
+            $this->_refundsByOrderId[$order->id] = $refunds;
+        }
+
+        return $this->_refundsByOrderId[$order->id];
     }
 
     /**
      * Returns the list of refunds for given order id
      * 
-     * @param integer $orderId
+     * @param int $orderId
      * 
      * @return Refund[]
      */
 
-    public function getRefundsForOrderId( integer $orderId ): array
+    public function getRefundsForOrderId( int $orderId ): array
     {
-        if (!array_key_exists($orderId, $this->_refundsByOrderId))
-        {
-            $refunds = [];
-            $records = RefundRecord::findAll([ 'orderId' => $order->id ]);
-    
-            foreach ($records as $record)
-            {
-                $config = RefundRecord::getAttributes();
-                $refunds[] = new Refund($config);
-            }
-    
-            $this->_refundsByOrderId[$orderId] = $refunds;
-        }
+        $order = Commerce::getInstance()->getOrders()->getOrderById($orderId);
+        if (!$order) return [];
 
-        return $this->_refundsByOrderId[$orderId];
+        return $this->getRefundsForOrder($order);
     }
 
     /**

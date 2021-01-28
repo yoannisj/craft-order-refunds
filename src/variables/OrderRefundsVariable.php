@@ -21,6 +21,7 @@ use craft\commerce\elements\Order;
 use yoannisj\orderrefunds\OrderRefunds;
 use yoannisj\orderrefunds\models\Refund;
 use yoannisj\orderrefunds\services\Refunds;
+use yoannisj\orderrefunds\helpers\RefundHelper;
 
 /**
  * Twig templating variable with Order Refunds data and methods
@@ -108,12 +109,13 @@ class OrderRefundsVariable extends Refunds
     {
         $options = [];
 
+        $formatter = Craft::$app->getFormatter();
         $transactions = RefundHelper::getRefundableTransactions($order);
 
         foreach ($transactions as $transaction)
         {
             $labelType = Craft::t('commerce', ucfirst($transaction->type));
-            $labelDate = date($transaction->dateCreated, 'Y/m/d H:i');
+            $labelDate = $formatter->asDatetime($transaction->dateCreated, 'Y/m/d H:i');
             $labelGateway = $transaction->getGateway()->name;
 
             $options[] = [
@@ -141,6 +143,9 @@ class OrderRefundsVariable extends Refunds
         // no refundable line items? no table data!
         if (empty($quantities)) return null;
 
+        $view = Craft::$app->getView();
+        $formatter = Craft::$app->getFormatter();
+
         $cols = $this->getLineItemsTableCols();
         $rows = [];
 
@@ -149,14 +154,18 @@ class OrderRefundsVariable extends Refunds
             $lineItem = ArrayHelper::firstWhere($lineItems, 'id', $lineItemId);
             if (!$lineItem) continue;
 
-            $salePriceText = $formatter->asCurrency($lineItem->salePrice, $currency);
-            $subtotalText = $formatter->asCurrency($lineItem->subtotal, $currency);
+            $refundQty = 0;
+            $salePrice = $lineItem->salePrice;
+            $subtotal = $salePrice * $refundQty;
+
+            $salePriceText = $formatter->asCurrency($salePrice, $currency);
+            $subtotalPriceText = $formatter->asCurrency($subtotal, $currency);
 
             $qtyName = 'lineItems['.$lineItem->id.'][qty]';
             $qtyInput = $view->renderTemplate('_includes/forms/text', [
                 'type' => 'number',
                 'name' => $qtyName,
-                'value' => 0,
+                'value' => $refundQty,
                 'size' => 3,
                 'min' => 0,
                 'max' => $qty,
@@ -164,13 +173,13 @@ class OrderRefundsVariable extends Refunds
                 'placeholder' => 0,
                 'disabled' => false,
             ]);
-            $qtySuffix = '<span class="code extralight"> of '.$qty.'</span>';
+            $qtySuffix = '<span class="code extralight">of '.$qty.'</span>';
 
             $rows[$lineItem->id] = [
-                'description' => '<span class="refund-item-description">'.$lineItem->description.'</span>',
-                'salePrice' => '<span class="refund-item-saleprice">'.$salePriceText.'</span>',
-                'quantity' => '<span class="refund-item-qty">'.$qtyInput.' '.$qtySuffix.'</span>',
-                'subtotal' => '<span class="refund-item-subtotal">'.$subtotalText.'</span>',
+                'description' => $lineItem->description,
+                'salePrice' => '<span data-amount="'.$salePrice.'">'.$salePriceText.'</span>',
+                'qty' => $qtyInput.$qtySuffix,
+                'subtotal' => '<span data-amount="'.$subtotal.'">'.$subtotalPriceText.'</span>',
             ];
         }
 
@@ -207,9 +216,9 @@ class OrderRefundsVariable extends Refunds
 
             $rows[$lineItem->id] = [
                 'description' => $lineItem->description,
-                'salePrice' => '<span class="refund-detail-item-saleprice">'.$salePriceText.'</span>',
-                'qty' => '<span class="refund-detail-item-qty code">'.$lineItem->qty.'</span>',
-                'subtotal' => '<span class="refund-detail-item-subtotal">'.$subtotalText.'</span>',
+                'salePrice' => $salePriceText,
+                'qty' => '<span class="code">'.$lineItem->qty.'</span>',
+                'subtotal' => $subtotalText,
             ];
         }
 
@@ -232,24 +241,28 @@ class OrderRefundsVariable extends Refunds
     {
         return [
             'description' => [
-                'type' => 'text',
+                'type' => 'html',
                 'heading' => Craft::t('commerce', 'Description'),
                 'order' => 1,
+                'class' => 'refund-item-description',
             ],
             'salePrice' => [
                 'type' => 'html',
                 'heading' => Craft::t('commerce', 'Sale Price'),
                 'order' => 2,
+                'class' => 'refund-item-saleprice',
             ],
             'qty' => [
                 'type' => 'html',
                 'heading' => Craft::t('commerce', 'Quantity'),
                 'order' => 3,
+                'class' => 'refund-item-qty',
             ],
             'subtotal' => [
                 'type' => 'html',
                 'heading' => Craft::t('commerce', 'Subtotal'),
                 'order' => 4,
+                'class' => 'refund-item-subtotal',
             ],
         ];
     }
