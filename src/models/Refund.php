@@ -45,73 +45,91 @@ class Refund extends Model
     // =========================================================================
 
     /**
-     * @var integer
+     * @var integer Unique identifier for the refund
      */
 
     public $id;
 
     /**
-     * @var string
+     * @var string Unique reference for the refund (uses sequence)
      */
 
     public $reference;
 
     /**
-     * @var integer
+     * @var integer ID of refunding transaction
      */
 
     public $transactionId;
 
     /**
-     * @var \craft\commerce\models\Transaction
+     * @var Transaction Reference to refunded transaction
      */
 
     private $_transaction;
 
     /**
-     * @var bool
+     * @var integer ID of parent transaction (transaction that was refunded)
      */
 
-    private $_includesAllLineItems = false;
+    private $_parentTransactionId;
 
     /**
-     * @var array
+     * @var Transaction Reference to parent transaction (transaction that was refunded)
+     */
+
+    private $_parentTransaction;
+
+    /**
+     * @var int ID of refunded order
+     */
+
+    private $_orderId;
+
+    /**
+     * @var Order Reference to refunded order
+     */
+
+    private $_order;
+
+    /**
+     * @var array Data for line items covered by the refund
      */
 
     private $_lineItemsData = [];
 
     /**
-     * @var bool
+     * @var bool Whether the refund covers the order's shipping cost
      */
 
     private $_includesShipping = false;
 
     /**
-     * @var \modules\costes\models\RefundLineItem[]
+     * @var RefundLineItem[] Computed list of scoped refund line items
      */
 
     private $_lineItems;
 
     /**
-     * @var \craft\commerce\models\OrderAdjustment[]
+     * @var OrderAdjustment[] Computed list of scoped refund adjustments
      */
 
     private $_adjustments;
 
     /**
-     * @var string|Datetime
+     * @var string|Datetime Date at which the refund was created
      */
 
     public $dateCreated;
 
     /**
-     * @var string|Datetime
+     * @var string|Datetime Date at which the refund was updated
      */
 
     public $dateUpdated;
 
     /**
-     * @var string
+     * @var string Unique identifier string
      */
 
     public $uid;
@@ -130,37 +148,10 @@ class Refund extends Model
     {
         $attributes = parent::attributes();
 
-        $attributes[] = 'includesAllLineItems';
         $attributes[] = 'lineItemsData';
         $attributes[] = 'includesShipping';
 
         return $attributes;
-    }
-
-    /**
-     * Setter for the `includesAllLineItems` property
-     * 
-     * @param bool $value
-     */
-
-    public function setIncludesAllLineItems( bool $value )
-    {
-        $this->_includesAllLineItems = $value;
-
-        // force re-calculation of computed properties that are affected
-        $this->_lineItems = null;
-        $this->_adjustments = null;
-    }
-
-    /**
-     * Getter for the `lineItemsData` property
-     * 
-     * @return bool
-     */
-
-    public function getIncludesAllLineItems(): bool
-    {
-        return $this->_includesAllLineItems;
     }
 
     /**
@@ -231,15 +222,67 @@ class Refund extends Model
         $rules['attrArray'] = [ ['lineItemsData'], ArrayValidator::class ];
         $rules['attrId'] = [ ['transactionId'], 'integer', 'min' => 1 ];
 
-        $rules['transactionIdRefund'] = [
+        $rules['transactionIdCorrespond'] = [
             'transactionId',
-            function(string $attribute, $params, InlineValidator $validator, $currentId)
+            function(string $attribute, $params, InlineValidator $validator, $value)
             {
                 $transaction = $this->getTransaction();
-                if ($transaction && $transaction->type != 'refund')
+                $orderId = $this->_orderId;
+                $parentTransactionId = $this->_parentTransactionId;
+
+                if ($transaction && $orderId && $transaction->orderId != $orderId)
                 {
                     $validator->addError($this, $attribute,
-                        "The `{attribute}` transaction must be of type 'refund'");
+                        '{attribute} value `{value}` does not correspond with order');
+                }
+
+                if ($transaction && $parentTransactionId && $transaction->$parentTransactionId != $parentTransactionId)
+                {
+                    $validator->addError($this, $attribute,
+                        '{attribute} value `{value}` does not correspond with parent transaction');
+                }
+            }
+        ];
+
+        $rules['orderIdCorrespond'] = [
+            'orderId',
+            function(string $attribute, $params, InlineValidator $validator, $value)
+            {
+                $transaction = $this->getTransaction();
+                $parentTransaction = $this->getParentTransaction();
+
+                if ($transaction && $transaction->orderId != $value)
+                {
+                    $validator->addError($this, $attribute,
+                        '{attribute} value `{value}` does not correspond with transaction');
+                }
+
+                if ($parentTransaction && $parentTransaction->orderId != $value)
+                {
+                    $validator->addError($this, $attribute,
+                        '{attribute} value `{value}` does not correspond with parent transaction');
+                }
+            }
+        ];
+
+        $rules['parentTransactionIdCorrespond'] = [
+            'parentTransactionId',
+            function(string $attribute, $params, InlineValidator $validator, $value)
+            {
+                $parentTransaction = $this->getParentTransaction();
+                $orderId = $this->_orderId;
+                $transaction = $this->getTransaction();
+
+                if ($transaction && $transaction->parentId != $value)
+                {
+                    $validator->addError($this, $attribute,
+                        '{attribute} value `{value}` does not correspond with transaction');
+                }
+
+                if ($orderId && $parentTransaction && $orderId != $parentTransaction->orderId)
+                {
+                    $validator->addError($this, $attribute,
+                        '{attribute} value `{value}` does not correspond with order');
                 }
             }
         ];
@@ -258,9 +301,10 @@ class Refund extends Model
     {
         $fields = parent::fields();
 
-        $fields[] = 'transactionDate';
-        $fields[] = 'paymentCurrency';
         $fields[] = 'orderId';
+        $fields[] = 'parentTransactionId';
+        $fields[] = 'transactionDate';
+        $fields[] = 'transactionCurrency';
         $fields[] = 'transactionNote';
 
         $fields[] = 'lineItems';
@@ -288,14 +332,149 @@ class Refund extends Model
     {
         $fields = parent::extraFields();
 
-        $fields[] = 'transaction';
         $fields[] = 'order';
+        $fields[] = 'parentTransaction';
+        $fields[] = 'transaction';
 
         return $fields;
     }
 
     /**
-     * @return \craft\commerce\models\Transaction \ null
+     * Setter for defaulted `orderId` property
+     * 
+     * @param int|null $orderId
+     */
+
+    public function setOrderId( int $orderId = null )
+    {
+        $this->_orderId = $orderId;
+
+        if ($this->_order
+            && $this->_order->id != $orderId)
+        {
+            $this->_order = null;
+        }
+    }
+
+    /**
+     * Getter for defaulted `orderId` property
+     * 
+     * @return int|null
+     */
+
+    public function getOrderId()
+    {
+        if (!isset($this->_orderId)
+            && ($transaction = $this->getTransaction())
+        ) {
+            $this->_orderId = $transaction->orderId;
+        }
+
+        return $this->_orderId;
+    }
+
+    /**
+     * Setter for computed `order` property
+     * 
+     * @param Order|null $value
+     */
+
+    public function setOrder( Order $order = null )
+    {
+        $this->_order = $order;
+
+        if ($order) {
+            $this->_orderId = $order->id;
+        }
+    }
+
+    /**
+     * Getter for computed `order` property
+     * 
+     * @return Order|null
+     */
+
+    public function getOrder()
+    {
+        if (!isset($this->_order)
+            && ($orderId == $this->getOrderId())
+        ) {
+            $this->_order = Commerce::getInstance()->getOrders()
+                ->getOrderById($orderId);
+        }
+
+        return $this->_order;
+    }
+
+    /**
+     * Setter for defaulted `parentTransactionId` property
+     * 
+     * @param int|null $transactionId
+     */
+
+    public function setParentTransactionId( int $transactionId = null )
+    {
+        $this->_parentTransactionId = $transactionId;
+
+        if ($this->_parentTransaction
+            && $this->_parentTransaction->id != $transactionId)
+        {
+            $this->_parentTransaction = null;
+        }
+    }
+
+    /**
+     * Getter for defaulted `parentTransactionId` property
+     * 
+     * @return int|null
+     */
+
+    public function getParentTransactionId()
+    {
+        if (!isset($this->_parentTransactionId)
+            && ($transaction = $this->getTransaction())
+        ) {
+            $this->_parentTransactionId = $transaction->parentId;
+        }
+
+        return $this->_parentTransactionId;
+    }
+
+    /**
+     * Setter for computed `parentTransaction` property
+     * 
+     * @param Transaction|null $value
+     */
+
+    public function setParentTransaction( Transaction $transaction = null )
+    {
+        $this->_parentTransaction = $transaction;
+
+        if ($transaction) {
+            $this->_parentTransactionId = $transaction->id;
+        }
+    }
+
+    /**
+     * Getter for computed `parentTransaction` property
+     * 
+     * @return Transaction|null
+     */
+
+    public function getParentTransaction()
+    {
+        if (!isset($this->_parentTransaction)
+            && ($parentTransactionId = $this->getParentTransactionId())
+        ) {
+            $this->_parentTransaction = Commerce::getInstance()->getTransactions()
+                ->getTransactionById($parentTransactionId);
+        }
+
+        return $this->_parentTransaction;
+    }
+
+    /**
+     * @return Transaction \ null
      */
 
     public function getTransaction()
@@ -324,7 +503,7 @@ class Refund extends Model
      * @return string | null
      */
 
-    public function getPaymentCurrency()
+    public function getTransactionCurrency()
     {
         $transaction = $this->getTransaction();
         return $transaction ? $transaction->paymentCurrency : null;
@@ -341,29 +520,9 @@ class Refund extends Model
     }
 
     /**
-     * @return \craft\commerce\elements\Order | null
-     */
-
-    public function getOrder()
-    {
-        $transaction = $this->getTransaction();
-        return ($transaction ? $transaction->getOrder() : null);
-    }
-
-    /**
-     * @return int | null
-     */
-
-    public function getOrderId()
-    {
-        $order = $this->getOrder();
-        return $order ? $order->id : null;
-    }
-
-    /**
      * Returns order line items covered by the refund
      * 
-     * @return \modules\costes\models\RefundLineItem[]
+     * @return RefundLineItem[]
      */
 
     public function getLineItems(): array
@@ -412,7 +571,7 @@ class Refund extends Model
     /**
      * Returns all order adjustments covered by the refund
      * 
-     * @return \craft\commerce\models\OrderAdjustment[]
+     * @return OrderAdjustment[]
      */
 
     public function getAdjustments(): array
@@ -427,7 +586,7 @@ class Refund extends Model
     /**
      * Returns order-level adjustments covered by the refund
      * 
-     * @return \craft\commerce\models\OrderAdjustment[]
+     * @return OrderAdjustment[]
      */
 
     public function getOrderAdjustments(): array
@@ -509,7 +668,7 @@ class Refund extends Model
     // =========================================================================
 
     /**
-     * @return \modules\costes\models\RefundLineItem[]
+     * @return RefundLineItem[]
      */
 
     protected function calculateLineItems(): array
@@ -540,7 +699,7 @@ class Refund extends Model
     }
 
     /**
-     * @return \craft\commerce\models\OrderAdjustment[]
+     * @return OrderAdjustment[]
      */
 
     protected function calculateAdjustments(): array

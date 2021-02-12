@@ -92,7 +92,6 @@ class Install extends Migration
                 'id' => $this->primaryKey(),
                 'transactionId' => $this->integer()->notNull(),
                 'reference' => $this->string()->notNull(),
-                'includesAllLineItems' => $this->boolean()->defaultValue(false),
                 'lineItemsData' => $this->json(),
                 'includesShipping' => $this->boolean()->defaultValue(false),
                 'dateCreated' => $this->dateTime()->notNull(),
