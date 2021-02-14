@@ -9,104 +9,293 @@
   display: none !important;
 }
 
-.order-refunds {
-  margin-top: 30px;
+/** =Refunds
+ * ------------------------------------------------------------------------- */
+
+.refunds {
+  margin-top: 40px;
 }
 
-.order-refund {
+/** =Refund
+ * ------------------------------------------------------------------------- */
+
+.refund {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
 }
-
-.refund-header { width: 25%; }
-.refund-detail { width: 75%; }
 
 .refund-header,
-.refund-transaction,
-.refund-options,
-.refund-items,
-.refund-note {
-  margin-bottom: 10px;
-  padding: 10px 0;
+.refund-main {
+  box-sizing: border-box;
 }
 
-.refund-reference,
-.refund-date {
-  margin: 0 20px 7px 0;
+.refund-header {
+  position: relative;
+  margin-bottom: 20px;
 }
 
-.refund-options {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.refund-allitems,
-.refund-shipping {
-  flex-basis: 50%;
-  margin-left: -7px;
-  margin-right: -7px;
-  margin-bottom: 7px;
-}
-
-.refund-allitems .field,
-.refund-shipping .field {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  margin: 5px 0;
-  padding: 0 7px;
-}
-
-.refund-allitems .heading,
-.refund-shipping .heading {
-  order: 2;
+.refund-title,
+.refund-caption {
   margin: 0;
-  flex: 0 1 auto;
-  justify-content: flex-start;
-} 
-
-.refund-allitems .input,
-.refund-shipping .input {
-  order: 1;
-  flex: 0 0 45px;
 }
 
-.refund-item-description,
-.refund-item-saleprice,
-.refund-item-subtotal {
-  padding: 7px 10px !important;
+.refund-edit {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
-.refund-item-description {
-  text-align: left !important;
+.refund-summary {
+  margin: 0 -10px;
 }
 
-.refund-item-saleprice,
-.refund-item-subtotal {
-  text-align: right !important;
+.refund-summary-detail {
+  display: flex;
+  flex-direction: column;
 }
 
-.refund-item-qty {
-  width: 120px;
-  padding: 0 !important;
+.refund-summary-lineitems,
+.refund-summary-shipping,
+.refund-summary-note,
+.refund-summary-transaction,
+.refund-summary-amount,
+.refund-summary-controls {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 10px;
+}
+
+.refund-summary-lineitems,
+.refund-summary-shipping,
+.refund-summary-note,
+.refund-summary-transaction,
+.refund-summary-amount {
+  margin-bottom: 10px;
+}
+
+.refund-form-transaction,
+.refund-form-lineitems,
+.refund-form-shipping,
+.refund-form-note {
+  margin-bottom: 20px;
+}
+
+.refund-form-lineitems,
+.refund-form-shipping {
+  position: relative;
+}
+
+.refund-form-lineitems .heading,
+.refund-form-lineitems .instructions {
+  padding-right: 90px;
+}
+
+.refund-form-itemsubtotal,
+.refund-form-shippingcost {
+  position: absolute;
+  top: 8px;
+  right: 0;
+}
+
+.refund-form-lineitems .editable {
+  table-layout: fixed;
+}
+
+.refund-form-lineitems .editable .refund-item-description {
+  text-align: left;
+}
+
+.refund-form-lineitems .editable .refund-item-saleprice,
+.refund-form-lineitems .editable .refund-item-subtotal {
+  width: 75px;
+}
+
+.refund-form-lineitems .editable .refund-item-saleprice {
+  text-align: center;
+}
+
+.refund-form-lineitems .editable .refund-item-subtotal {
+  text-align: right;
+}
+
+.refund-form-lineitems .editable .refund-item-qty {
+  width: 60px;
+}
+
+.refund-form-lineitems .editable td.refund-item-qty {
+  padding: 0 7px;
   white-space: nowrap;
 }
 
-.refund-item-qty input {
-  display: inline-block !important;
-  width: auto !important;
+.refund-form-lineitems .editable td.refund-item-qty input {
+  display: inline-block;
+  padding: 7px 7px 7px 0;
+  width: 55px;
+  text-align: right;
 }
 
-.refund-footer {
-  padding-top: 20px;
+.refund-form-lineitems .editable input[type=number]::-webkit-inner-spin-button, 
+.refund-form-lineitems .editable input[type=number]::-webkit-outer-spin-button { 
+  -webkit-appearance: none; 
+  margin: 0; 
+}
+
+.refund-form-lineitems .editable input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.refund-form-shipping {
+  padding-right: 90px;
+}
+
+.refund-form-shipping .field {
+  position: relative;
+  padding-right: 50px;
+  max-width: 420px;
+}
+
+.refund-form-shipping .input {
+  position: absolute;
+  top: 8px;
+  right: 0;
+}
+
+.refund-form-totals {
+  display: flex;
+  flex-direction: column;
+  margin: 20px 0 10px;
+  padding: 15px 0 10px;
   border-top: 1px solid rgba(51, 64, 77, 0.1);
 }
 
-.refund-total {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0;
-  font-size: 16px;
+.refund-form-totals .amount {
+  display: block;
+  position: relative;
+  margin-bottom: 5px;
+  text-align: right;
+}
+
+.refund-form-totals .amount::before {
+  content: attr(data-label);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 66.66667%;
   font-weight: bold;
+  text-align: left;
+  color: #596673;
+}
+
+/** =Breakpoints
+ * ------------------------------------------------------------------------- */
+
+@media (min-width: 480px)
+{
+  .refund-summary-detail {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .refund-summary-lineitems,
+  .refund-summary-note {
+    width: 66.66667%;
+  }
+
+  .refund-summary-shipping,
+  .refund-summary-amount {
+    width: 33.33333%;
+  }
+}
+
+@media (min-width: 768px)
+{
+  .refund {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .refund-header {
+    flex: 0 0 25%;
+    padding-right: 20px;
+  }
+
+  .refund-edit {
+    position: static;
+    margin-top: 5px;
+  }
+
+  .refund-main { 
+    flex: 0 0 75%;
+  }
+
+  .refund-main--new {
+    margin-left: 25%;
+  }
+
+  .refund-form-totals {
+    flex-direction: row;
+    flex-wrap: nowrap;
+  }
+
+  .refund-form-total,
+  .refund-form-transaction-amount {
+    flex-basis: 50%;
+  }
+
+  .refund-form-total {
+    margin-left: 10px;
+  }
+
+  .refund-form-transaction-amount {
+    margin-right: 10px;
+  }
+}
+
+@media (min-width: 974px)
+{
+  .refund-header {
+    flex: 0 0 33.33333%;
+  }
+
+  .refund-main {
+    flex: 0 0 66.66667%;
+  }
+
+  .refund-main--new {
+    margin-left: 33.33333%;
+  }
+}
+
+@media (min-width: 1440px)
+{
+  .refund-header {
+    flex: 0 0 25%;
+  }
+
+  .refund-main {
+    flex: 0 0 75%;
+  }
+
+  .refund-main--new {
+    margin-left: 25%;
+  }
+}
+
+/** =State
+ * ------------------------------------------------------------------------- */
+
+.refund-editor .refund-form,
+.refund-editor.is-editing .refund-edit,
+.refund-editor.is-editing .refund-summary  {
+  display: none;
+}
+
+.refund-editor.is-editing .refund-form {
+  display: block;
+}
+
+.refund-editor.is-calculating .refund-item-qty input,
+.refund-editor.is-calculating .refund-shipping-field .lightswitch {
+  pointer-events: none;
+  opacity: 0.5;
 }

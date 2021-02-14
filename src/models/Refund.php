@@ -259,8 +259,8 @@ class Refund extends Model
 
                 if ($parentTransaction && $parentTransaction->orderId != $value)
                 {
-                    $validator->addError($this, $attribute,
-                        '{attribute} value `{value}` does not correspond with parent transaction');
+                    $validator->addError($this, $attribute, Craft::t('order-refunds',
+                        '{attribute} value `{value}` does not correspond with parent transaction'));
                 }
             }
         ];
@@ -275,15 +275,31 @@ class Refund extends Model
 
                 if ($transaction && $transaction->parentId != $value)
                 {
-                    $validator->addError($this, $attribute,
-                        '{attribute} value `{value}` does not correspond with transaction');
+                    $validator->addError($this, $attribute, Craft::t('order-refunds',
+                        '{attribute} value `{value}` does not correspond with transaction.'));
                 }
 
                 if ($orderId && $parentTransaction && $orderId != $parentTransaction->orderId)
                 {
-                    $validator->addError($this, $attribute,
-                        '{attribute} value `{value}` does not correspond with order');
+                    $validator->addError($this, $attribute, Craft::t('order-refunds',
+                        '{attribute} value `{value}` does not correspond with order.'));
                 }
+            }
+        ];
+
+        $rules['totalMatchesTransaction'] = [
+            'total',
+            function(string $attribute, $params, InlineValidator $validator, $value)
+            {
+                $transaction = $this->getTransaction();
+                if ($transaction && $transaction->amount != $this->getTotal())
+                {
+                    $validator->addError($this, $attribute, Craft::t('order-refunds',
+                        '{attribute} must match the refund transaction amount.'));
+                }
+            },
+            'when' => function($model) {
+                return !empty($model->transactionId);
             }
         ];
 
@@ -397,7 +413,7 @@ class Refund extends Model
     public function getOrder()
     {
         if (!isset($this->_order)
-            && ($orderId == $this->getOrderId())
+            && ($orderId = $this->getOrderId())
         ) {
             $this->_order = Commerce::getInstance()->getOrders()
                 ->getOrderById($orderId);
@@ -605,6 +621,21 @@ class Refund extends Model
     }
 
     /**
+     * @return float
+     */
+
+    public function getAdjustmentsTotal(): float
+    {
+        $total = 0;
+
+        foreach ($this->getAdjustments() as $adjustment) {
+            $total += $adjustment->amount;
+        }
+
+        return $total;
+    }
+
+    /**
      * Returns total shipping cost covered by the refund
      * 
      * @return float
@@ -612,7 +643,16 @@ class Refund extends Model
 
     public function getTotalShippingCost(): float
     {
-        return 0;
+        $total = 0;
+
+        foreach ($this->getAdjustments() as $adjustment)
+        {
+            if ($adjustment->type == 'shipping') {
+                $total += $adjustment->amount;
+            }
+        }
+
+        return $total;
     }
 
     /**
@@ -623,6 +663,14 @@ class Refund extends Model
 
     public function getTotalTax(): float
     {
+        $total = 0;
+
+        foreach ($this->getAdjustments() as $adjustment)
+        {
+            if ($adjustment->type == 'tax') {
+                $total += $adjustment->amount;
+            }
+        }
         return 0;   
     }
 
@@ -634,16 +682,16 @@ class Refund extends Model
 
     public function getTotalTaxIncluded(): float
     {
-        return 0;
-    }
+        $total = 0;
 
-    /**
-     * @return float
-     */
+        foreach ($this->getAdjustments() as $adjustment)
+        {
+            if ($adjustment->type == 'tax' && $adjustment->included) {
+                $total += $adjustment->amount;
+            }
+        }
 
-    public function getAdjustmentsTotal(): float
-    {
-        return 0;
+        return $total;
     }
 
     /**
@@ -676,15 +724,12 @@ class Refund extends Model
         $order = $this->getOrder();
         if (!$order) return [];
 
-        $includesAllItems = $this->getIncludesAllLineItems();
         $lineItemsData = $this->getLineItemsData();
-
         $lineItems = [];
 
         foreach ($order->getLineItems() as $lineItem)
         {
-            $refundQty = ($includesAllItems ? $orderLineItem->qty :
-                ($lineItemsData[$lineItem->id]['qty'] ?? 0));
+            $refundQty = ($lineItemsData[$lineItem->id]['qty'] ?? 0);
 
             // leave out line items that are not included by refund
             if ($refundQty <= 0) continue;
@@ -708,8 +753,6 @@ class Refund extends Model
         if (!$order) return [];
 
         $orderAdjustments = $order->getAdjustments();
-
-        $includesAllItems = $this->getIncludesAllLineItems();
         $lineItemsData = $this->getLineItemsData();
         $includesShipping = $this->getIncludesShipping();
 
@@ -739,7 +782,7 @@ class Refund extends Model
             $refundAdjustment = clone $adjustment;
 
             // quantify line item adjustments per the refunded quantity
-            if (!$includesAllItems && $adjustment->lineItemId)
+            if ($adjustment->lineItemId)
             {
                 $lineItem = $adjustment->getLineItem();
                 if (!$lineItem) continue; // no line item, no adjustment
@@ -764,8 +807,7 @@ class Refund extends Model
 
         foreach ($order->getLineItems() as $lineItem)
         {
-            $refundQty = ($includesAllItems ? $lineItem->qty : 
-                ($lineItemsData[$lineItem->id]['qty'] ?? 0));
+            $refundQty = ($lineItemsData[$lineItem->id]['qty'] ?? 0);
 
             if ($refundQty <= 0) continue;
 

@@ -46,6 +46,9 @@ class OrderRefundsVariable extends Refunds
     // =Public Methods
     // =========================================================================
 
+    // =Orders
+    // -------------------------------------------------------------------------
+
     /**
      * Returns list of refund transactions for given Order
      * 
@@ -54,7 +57,7 @@ class OrderRefundsVariable extends Refunds
      * @return Transaction[]
      */
 
-    public static function getRefundTransactions( Order $order ): array
+    public function getRefundTransactions( Order $order ): array
     {
         return RefundHelper::getRefundTransactions($order);
     }
@@ -73,33 +76,6 @@ class OrderRefundsVariable extends Refunds
     }
 
     /**
-     * Returns list of refundable line item quantities for given Order
-     * (result maps line item id with quantity that was not refunded yet).
-     * 
-     * @param Order $order
-     * 
-     * @return array
-     */
-
-    public function getRefundableLineItemQuantities( Order $order ): array
-    {
-        RefundHelper::getRefundableLineItemQuantities($ordr);
-    }
-
-    /**
-     * Returns whether given Order's shipping can still be refunded
-     * 
-     * @param Order $order
-     * 
-     * @return bool
-     */
-
-    public static function canRefundOrderShipping( Order $order ): bool
-    {
-        return RefundHelper::canRefundOrderShipping($order);
-    }
-
-    /**
      * Computes options data for given Order's refundable transaction
      * 
      * @return array
@@ -114,17 +90,29 @@ class OrderRefundsVariable extends Refunds
 
         foreach ($transactions as $transaction)
         {
-            $labelType = Craft::t('commerce', ucfirst($transaction->type));
-            $labelDate = $formatter->asDatetime($transaction->dateCreated, 'Y/m/d H:i');
-            $labelGateway = $transaction->getGateway()->name;
+            $label = $this->getTransactionLabel($transaction);
 
             $options[] = [
-                'label' => "$labelType ($labelDate) - $labelGateway",
+                'label' => $label,
                 'value' => $transaction->id,
             ];
         }
 
         return $options;
+    }
+
+    /**
+     * Returns list of refundable line item quantities for given Order
+     * (result maps line item id with quantity that was not refunded yet).
+     * 
+     * @param Order $order
+     * 
+     * @return array
+     */
+
+    public function getRefundableLineItemQuantities( Order $order ): array
+    {
+        RefundHelper::getRefundableLineItemQuantities($ordr);
     }
 
     /**
@@ -136,12 +124,9 @@ class OrderRefundsVariable extends Refunds
 
     public function getRefundableLineItemsTableData( Order $order )
     {
+        $refundableQuantities = RefundHelper::getRefundableLineItemQuantities($order);
+        $orderLineItems = $order->getLineItems();
         $currency = $order->getPaymentCurrency();
-        $lineItems = $order->getLineItems();
-        $quantities = RefundHelper::getRefundableLineItemQuantities($order);
-
-        // no refundable line items? no table data!
-        if (empty($quantities)) return null;
 
         $view = Craft::$app->getView();
         $formatter = Craft::$app->getFormatter();
@@ -149,14 +134,13 @@ class OrderRefundsVariable extends Refunds
         $cols = $this->getLineItemsTableCols();
         $rows = [];
 
-        foreach ($quantities as $lineItemId => $qty)
+        foreach ($refundableQuantities as $lineItemId => $qty)
         {
-            $lineItem = ArrayHelper::firstWhere($lineItems, 'id', $lineItemId);
+            $lineItem = ArrayHelper::firstWhere($orderLineItems, 'id', $lineItemId);
             if (!$lineItem) continue;
 
-            $refundQty = 0;
             $salePrice = $lineItem->salePrice;
-            $subtotal = $salePrice * $refundQty;
+            $subtotal = $salePrice * $qty;
 
             $salePriceText = $formatter->asCurrency($salePrice, $currency);
             $subtotalPriceText = $formatter->asCurrency($subtotal, $currency);
@@ -165,7 +149,7 @@ class OrderRefundsVariable extends Refunds
             $qtyInput = $view->renderTemplate('_includes/forms/text', [
                 'type' => 'number',
                 'name' => $qtyName,
-                'value' => $refundQty,
+                'value' => 0,
                 'size' => 3,
                 'min' => 0,
                 'max' => $qty,
@@ -173,7 +157,7 @@ class OrderRefundsVariable extends Refunds
                 'placeholder' => 0,
                 'disabled' => false,
             ]);
-            $qtySuffix = '<span class="code extralight">of '.$qty.'</span>';
+            $qtySuffix = '<span class="extralight">/&thinsp;'.$qty.'</span>';
 
             $rows[$lineItem->id] = [
                 'description' => $lineItem->description,
@@ -190,34 +174,80 @@ class OrderRefundsVariable extends Refunds
     }
 
     /**
+     * Returns whether given Order's shipping can still be refunded
+     * 
+     * @param Order $order
+     * 
+     * @return bool
+     */
+
+    public static function canRefundOrderShipping( Order $order ): bool
+    {
+        return RefundHelper::canRefundOrderShipping($order);
+    }
+
+    // =Refunds
+    // -------------------------------------------------------------------------
+
+    /**
      * Computes table data for detail of line items included in given Refund.
      * Returns `null` if given refund does not cover any line item.
      * 
-     * @return array|null
+     * @return array
      */
 
-    public function getRefundDetailLineItemsTableData( Refund $refund )
+    public function getRefundLineItemsTableData( Refund $refund ): array
     {
-        $lineItems = $refund->getLineItems();
+        $order = $refund->getOrder();
+        if (!$order) return []; // no order? no line items table data
 
-        // no line items refunded? no table data!
-        if (empty($lineItems)) return null;
+        $refundableQuantities = RefundHelper::getRefundableLineItemQuantities($order);
+        $orderLineItems = $order->getLineItems();
+        $refundLineItems = $refund->getLineItems();
 
+        $view = Craft::$app->getView();
         $formatter = Craft::$app->getFormatter();
-        $currency = $refund->getPaymentCurrency();
+        $currency = $refund->getTransactionCurrency();
+        $inputNamespace = $refund->id .'[lineItemsData]';
 
         $cols = $this->getLineItemsTableCols();
         $rows = [];
 
-        foreach ($lineItems as $lineItem)
+        foreach ($orderLineItems as $lineItem)
         {
-            $salePriceText = $formatter->asCurrency($lineItem->salePrice, $currency);
-            $subtotal = $formatter->asCurrency($lineItem->subtotal, $currency);
+            $lineItemId = $lineItem->id;
+            $refundableQty = $refundableQuantities[$lineItemId] ?? 0;
 
-            $rows[$lineItem->id] = [
+            $refundLineItem = ArrayHelper::firstWhere($refundLineItems, 'id', $lineItemId);
+            $refundQty = $refundLineItem ? $refundLineItem->qty : 0;
+
+            // include this refund's line item quantity back into refundable quantity
+            $refundableQty += $refundQty;
+
+            // only include refundable line items
+            if ($refundableQty === 0) continue;
+
+            // get price texts
+            $salePrice = $lineItem->salePrice;
+            $subtotal = $salePrice * $refundQty;
+
+            $salePriceText = $formatter->asCurrency($salePrice, $currency);
+            $subtotalText = $formatter->asCurrency($subtotal, $currency);
+
+            $qtyHtml = $view->renderTemplate('_includes/forms/text', [
+                'type' => 'number',
+                'name' => $inputNamespace.'['.$lineItemId.'][qty]',
+                'value' => $refundQty,
+                'size' => 3,
+                'min' => 0,
+                'max' => $refundableQty,
+                'class' => 'refund-item-qty-input'
+            ]).'<small class="extralight">/&thinsp;'.$refundableQty.'</small>';
+
+            $rows[$lineItemId] = [
                 'description' => $lineItem->description,
                 'salePrice' => $salePriceText,
-                'qty' => '<span class="code">'.$lineItem->qty.'</span>',
+                'qty' => $qtyHtml,
                 'subtotal' => $subtotalText,
             ];
         }
@@ -226,6 +256,49 @@ class OrderRefundsVariable extends Refunds
             'cols' => $cols,
             'rows' => $rows,
         ];
+    }
+
+    // =Transactions
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns a string label for given transaction
+     * 
+     * @param Transaction $transaction
+     * 
+     * @return string
+     */
+
+    public function getTransactionLabel( Transaction $transaction ): string
+    {
+        $formatter = Craft::$app->getFormatter();
+        $gatewayLabel = str_replace('(', ', ', str_replace(')', '', $transaction->gateway));
+
+        $label = ucfirst($transaction->type);
+        $label .= ' (' .$gatewayLabel.')';
+        $label .= " / ".$formatter->asDate($transaction->dateCreated);
+        $label .= ' ('.$formatter->asTime($transaction->dateCreated).')';
+
+        return $label;
+    }
+
+    /**
+     * Returns a string label for given transaction
+     * 
+     * @param Transaction $transaction
+     * 
+     * @return string
+     */
+
+    public function getTransactionLabelHtml( Transaction $transaction ): string
+    {
+        $formatter = Craft::$app->getFormatter();
+
+        $label = ucfirst($transaction->type);
+        $label .= ' / '.$formatter->asDate($transaction->dateCreated);
+        $label .= '<br />'.$formatter->asTime($transaction->dateCreated);
+
+        return $label;
     }
 
     // =Protected Methods

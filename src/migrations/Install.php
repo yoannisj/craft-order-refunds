@@ -43,20 +43,21 @@ class Install extends Migration
 
     public function safeUp()
     {
-        Craft::error('RUN ORDER REFUNDS INSTALL MIGRATION', __METHOD__);
-
         try
         {
             $this->createRefundsTable();
             $this->createRefundRecords();
         }
 
-        catch (\Exception $error)
+        catch (\Exception $exception)
         {
-            echo $error->getMessage();
-            var_dump($error);
-
-            Craft::error($error->getMessage(), __METHOD__);
+            if (Craft::$app->getRequest()->getIsConsoleRequest()) {
+                echo $exception->getMessage();
+                var_dump($exception);
+            } else {
+                Craft::error($exception->getMessage(), __METHOD__);
+                Craft::$app->getErrorHandler()->logException($exception);
+            }
 
             return false;
         }

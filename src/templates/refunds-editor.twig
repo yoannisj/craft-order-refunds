@@ -23,18 +23,14 @@
 {% set refunds = craft.orderRefunds.getRefundsForOrder(order) %}
 {% set refundableTransactions = craft.orderRefunds.getRefundableTransactions(order) %}
 
-<div id="order-refunds" class="order-refunds" style="display: none;">
+<div id="order-refunds" class="refunds" style="display: none;">
 
     {% if refunds is not empty %}
         {% for refund in refunds %}
-
             <hr />
-
-            {% include 'order-refunds/_partials/refund-detail' with {
-                order: order,
+            {% include 'order-refunds/_partials/refund-editor' with {
                 refund: refund,
             } only %}
-
         {% endfor %}
     {% endif %}
 
@@ -44,76 +40,84 @@
         {% set lineItemsTableData = craft.orderRefunds.getRefundableLineItemsTableData(order) %}
         {% set hasLineItems = (lineItemsTableData is not empty) %}
         {% set canRefundShipping = craft.orderRefunds.canRefundOrderShipping(order) %}
-        {% set redirectPath = craft.app.request.pathInfo %}
 
         <hr />
-    
-        <form id="order-refund-form" class="order-refund-form" method="POST" action="">
 
-            <div class="order-refund">
-                <div class="refund-detail">
+        <div class="refund refund-editor">
+            <div class="refund-main refund-main--new" role="presentation">
+
+                <div class="refund-summary">
+                    <div class="refund-summary-controls text-right">
+                        <a class="refund-create btn" href="#new-refund-form">{{ 'New Refund' | t('order-refunds') }}</a>
+                    </div>
+                </div>
+
+                <div id="new-refund-form" class="refund-form">
                     {{ csrfInput() }}
 
-                    <div class="refund-transaction">
+                    <div class="refund-form-transaction">
                         {{ forms.selectField({
-                            label: 'Refunded Transaction',
-                            instructions: 'Select order transaction to refund',
+                            label: 'Refunded Transaction' | t('order-refunds'),
+                            instructions: 'Select order transaction to refund' | t('order-refunds'),
                             options: refundableTransactionOptions,
                         }) }}
                     </div>
 
-                    <div class="refund-options">
-                        <div class="refund-allitems">
-                            {{ forms.lightswitchField({
-                                label: 'Include all line items',
-                                name: 'includesAllLineItems',
-                                on: false,
-                                disabled: (hasLineItems ? false : true),
-                                reverseToggle: (hasLineItems ? '#refund-items' : null),
-                            }) }}
-                        </div>
-                        <div class="refund-shipping">
-                            {{ forms.lightswitchField({
-                                label: 'Include shipping',
-                                name: 'includesShipping',
-                                on: false,
-                                disabled: (canRefundShipping ? false : true),
-                            }) }}
-                        </div>
+                    <div class="refund-form-lineitems">
+                        <!-- =lineItemsData -->
+                        {{ forms.editableTableField({
+                            id: 'refund-new-lineitems',
+                            label: 'Line Items' | t('commerce'),
+                            instructions: 'Select which line items are covered by this refund' | t('order-refunds'),
+                            name: 'lineItemsData',
+                            cols: lineItemsTableData.cols,
+                            rows: lineItemsTableData.rows,
+                            staticRows: true,
+                        }) }}
+                        <span class="refund-form-itemsubtotal">
+                            {{- 0 | currency(order.paymentCurrency) -}}
+                        </span>
                     </div>
 
-                    {% if hasLineItems %}
-                        <div id="refund-items" class="refund-items">
-                            {{ forms.editableTableField({
-                                label: 'Refunded line items',
-                                id: 'refund-lineitemsdata',
-                                name: 'lineItemsData',
-                                instructions: 'Choose which line items to refund',
-                                static: false,
-                                staticRows: true,
-                                cols: lineItemsTableData.cols,
-                                rows: lineItemsTableData.rows,
-                            }) }}
-                        </div>
-                    {% endif %}
+                    <div class="refund-form-shipping">
+                        {{ forms.lightswitchField({
+                            id: 'refund-new-shipping',
+                            label: 'Includes Shipping',
+                            instructions: 'Whether this refund covers shipping costs' | t('order-refunds'),
+                            name: 'includesShipping',
+                            on: false,
+                            fieldAttributes: {
+                                class: 'refund-shipping-field field',
+                            },
+                        }) }}
+                        <span class="refund-form-shippingcost">
+                            {{- order.totalShippingCost | currency(order.paymentCurrency) -}}
+                        </span>
+                    </div>
 
-                    {{ forms.textField({
-                        label: 'Transaction note' | t('commerce'),
-                        instructions: "Add an optional note to the resulting refund transaction" | t('order-refunds'),
-                        name: 'note',
-                    }) }}
+                    <div class="refund-form-note">
+                        {{ forms.textField({
+                            id: 'refund-new-note',
+                            label: 'Transaction note' | t('commerce'),
+                            instructions: "Add an optional note to the refund transaction" | t('order-refunds'),
+                            name: 'note',
+                            value: '',
+                            placeholder: '',
+                        }) }}
+                    </div>
 
-                    <div class="text-right">
-                        <button type="submit" class="btn submit formsubmit"
-                            data-action="orderrefunds/refunds/create-refund" 
+                    <div class="refund-form-actions">
+                        <button type="button" class="refund-form-cancel btn">{{ 'Cancel' | t('commerce') }}</button>
+                        <button type="submit" class="refund-form-submit btn submit formsubmit"
+                            data-action="{{ actionUrl('orderrefunds/refunds/save') }}"
                             data-confirm="{{ 'Are you sure you want to refund this transaction?' | t('commerce') }}"
-                            data-redirect="{{ cpUrl(redirectPath) }}"
-                        >{{ 'Place Refund' | t('commerce') }}</button>
+                            data-redirect="{{ cpUrl(craft.app.request.pathInfo) }}"
+                        >{{ 'Refund' | t('commerce') }}</button>
                     </div>
+
                 </div>
             </div>
-
-        </form>
+        </div>
 
     {% endif %}
 </div>
