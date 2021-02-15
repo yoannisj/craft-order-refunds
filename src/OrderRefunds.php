@@ -120,7 +120,7 @@ class OrderRefunds extends Plugin
         // Load order refunds on Order edit screen
         Craft::$app->getView()->hook(
             'cp.commerce.order.edit.main-pane',
-            [ $this, 'getRefundsEditorHtml' ]
+            [ $this, 'getOrderRefundsHtml' ]
         );
 
         Craft::info(Craft::t('order-refunds', '{name} plugin initialized', [
@@ -145,7 +145,7 @@ class OrderRefunds extends Plugin
      * @return string|null
      */
 
-    public function getRefundsEditorHtml( array &$context )
+    public function getOrderRefundsHtml( array &$context )
     {
         $order = $context['order'] ?? null;
         if (!$order) return '';
@@ -160,13 +160,20 @@ class OrderRefunds extends Plugin
             'order' => $order
         ]);
 
-        // register js to initialize edit UI
-        $jsOptions = [
-            'orderId' => $order->id,
-        ];
+        $view->registerJs('
+            // get order refunds container
+            var $orderRefunds = $("#order-refunds");
 
-        $view->registerJs('new RefundsEditor("#transactionsTab", '
-            . JsonHelper::encode($jsOptions).')');
+            // initialize refund editors
+            $orderRefunds.find(".refund-editor").each(function() {
+                var $editor = $(this);
+                $editor.data("refundEditor", new RefundEditor($editor));
+            });
+
+            // move order refunds to transactions tab, and show them
+            $("#transactionsTab").append($orderRefunds);
+            $orderRefunds.show().removeClass("hide").removeAttr("hidden");
+        ');
 
         return $html;
     }
