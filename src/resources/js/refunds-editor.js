@@ -46,6 +46,18 @@
             this.$form.wrapInner('<form method="POST" action="">');
             this.$form = this.$form.find('form');
         }
+
+        this.$lineItemRows = this.$form.find('.refund-form-lineitems tbody tr');
+        this.$itemSubtotal = this.$form.find('.refund-form-itemsubtotal');
+        this.$shippingCost = this.$form.find('.refund-form-shippingcost');
+        this.$taxIncluded = this.$form.find('.refund-form-taxincluded');
+        this.$taxExcluded = this.$form.find('.refund-form-taxexcluded');
+        this.$total = this.$form.find('.refund-form-total');
+        this.$transactionAmount = this.$form.find('.refund-form-transactionamount');
+
+        this.$attributeElements = this.$form.find('[data-attribute]');
+        this.$errors = this.$form.find('.refund-form-errors');
+        this.$submit = this.$form.find('.refund-submit');
     };
 
     /**
@@ -57,7 +69,7 @@
         this.isEditing = !this.$form.hasClass('is-editing');
         this.toggle();
 
-        console.log('init state', this.isEditing);
+        this.updateLineItemRows();
     };
 
     /**
@@ -94,12 +106,8 @@
 
     RefundEditor.prototype.toggleOn = function()
     {
-        console.log('toggleOn?', '-> isEditing:', this.isEditing);
-
         if (this.isEditing) return;
         this.isEditing = true;
-
-        console.log('toggleOn!', '-> isEditing:', this.isEditing);
 
         this.$container.addClass('is-editing');
     };
@@ -110,12 +118,35 @@
 
     RefundEditor.prototype.toggleOff = function()
     {
-        console.log('toggleOff?', '-> isEditing:', this.isEditing);
-
         if (!this.isEditing) return;
         this.isEditing = false;
 
         this.$container.removeClass('is-editing');
+    };
+
+    /**
+     * Updates rows in line items table
+     */
+
+    RefundEditor.prototype.updateLineItemRows = function()
+    {
+        this.$lineItemRows.each(function()
+        {
+            var $row = $(this),
+                $qtyInput = $row.find('.refund-item-qty input'),
+                $restockLightswitch = $row.find('.refund-item-restock .lightswitch'),
+                restockLightswitch = $restockLightswitch.data('lightswitch');
+
+            if ($qtyInput.val() == 0)
+            {
+                $restockLightswitch.disable();
+                if (restockLightswitch) restockLightswitch.turnOff();
+            }
+
+            else {
+                $restockLightswitch.enable();
+            }
+        });
     };
 
     /**
@@ -131,9 +162,16 @@
 
         console.log('RefundEditor::calculate()');
     
+        var params = this.$form.serializeArray();
+        params.push({
+            name: 'action',
+            value: 'order-refunds/refunds/calculate'
+        });
+
         $.ajax({
+            url: '/index.php',
             method: 'POST',
-            data: this.$form.serialize(),
+            data: params,
             dataType: 'json',
             success: $.proxy(this.handleCalculateSuccess, this),
             error: $.proxy(this.handleCalculateError, this),
@@ -147,8 +185,6 @@
     RefundEditor.prototype.onEditControlClick = function(ev)
     {
         ev.preventDefault();
-
-        console.log('RefundEditor::onEditControlClick!');
         this.toggleOn();
     };
 
@@ -159,8 +195,6 @@
     RefundEditor.prototype.onCancelControlClick = function(ev)
     {
         ev.preventDefault();
-
-        console.log('RefundEditor::onCancelControlClick!');
         this.toggleOff();
     };
 
@@ -197,27 +231,92 @@
      * Ajax handler for successful calculation
      */
 
-    RefundEditor.prototype.handleCalculateSuccess = function()
+    RefundEditor.prototype.handleCalculateSuccess = function( results, statusTest, jqXhr )
     {
         this.isCalculating = false;
         this.$container.removeClass('is-calculating');
 
-        console.log('RefundEditor::onCalculateSuccess()', arguments);
+        console.log('RefundEditor::onCalculateSuccess()', results);
+
+        if (results.success)
+        {
+            var refund = results.refund;
+            this.updateLineItemRows();
+
+            console.log('itemSubtotal', this.$itemSubtotal.length, refund.itemSubtotalAsCurrency);
+            console.log('shippingCost', this.$shippingCost.length, refund.totalShippingCostAsCurrency);
+            console.log('taxIncluded', this.$taxIncluded.length, refund.totalTaxIncludedAsCurrency);
+            console.log('taxExcluded', this.$taxExcluded.length, refund.totalTaxExcludedAsCurrency);
+            console.log('total', this.$total.length, refund.totalAsCurrency);
+            console.log('transactionAmount', this.$transactionAmount.length, refund.$transactionAmountAsCurrency);
+
+            this.$itemSubtotal.html(refund.itemSubtotalAsCurrency);
+            this.$shippingCost.html(refund.totalShippingCostAsCurrency);
+            this.$taxIncluded.html(refund.totalTaxIncludedAsCurrency);
+            this.$taxExcluded.html(refund.totalTaxExcludedAsCurrency);
+            this.$total.html(refund.totalAsCurrency);
+
+            if (this.$transactionAmount.length) {
+                this.$transactionAmount.html(refund.transactionAmountAsCurrency);
+            }
+        }
+
+        // validation feedback
+        this.$attributeElements.removeClass('error');
+
+        if (!results.isValid)
+        {
+            var errorsHtml = '<ul>', attributeErrors;
+            for (var attribute in results.validationErrors)
+            {
+                this.$attributeElements
+                    .filter('[data-attribute="'+attribute+'"]')
+                    .addClass('error');                    
+
+                attributeErrors = results.validationErrors[attribute];
+                errorsHtml += '<li>'+attributeErrors.join('<br />')+'</li>';
+            }
+            errorsHtml += '</ul>';
+
+            this.$errors.html(errorsHtml).show();
+            this.$submit.disable();
+        }
+
+        else {
+            this.$errors.html('').hide();
+            this.$submit.enable();
+        }
     };
 
     /**
      * Ajax handler for errors in calculation
      */
 
-    RefundEditor.prototype.handleCalculateError = function()
+    RefundEditor.prototype.handleCalculateError = function( jqXhr, statusText, errorMessage )
     {
         this.isCalculating = false;
         this.$container.removeClass('is-calculating');
 
-        console.log('RefundEditor::onCalculateError()', arguments);
+        console.log('RefundEditor::onCalculateError()', errorMessage);
     };
 
     // export RefundEditor Class
     window.RefundEditor = RefundEditor;
+
+    // initialize refund editors on page
+    $('.refund-editor').each(function() {
+        var $editor = $(this);
+        $editor.data("refundEditor", new RefundEditor($editor));
+    });
+
+    // initiliaze refund editors on commerce order page
+    var $orderRefunds = $("#order-refunds");
+    var $transactionsTab = $('#transactionsTab');
+    
+    if ($orderRefunds.length && $transactionsTab.length) {
+        // move order refunds to transactions tab, and show them
+        $transactionsTab.append($orderRefunds);
+        $orderRefunds.show().removeClass("hide").removeAttr("hidden");
+    }
 
 })(window, jQuery);

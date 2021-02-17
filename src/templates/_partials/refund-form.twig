@@ -1,0 +1,154 @@
+{##
+ # Order Refunds plugin for Craft CMS 3.x
+ #
+ # Detailed refunds for Craft Commerce orders
+ #
+ # @author Yoannis Jamar
+ # @copyright Copyright (c) 2017 Yoannis Jamar
+ # @link https://github.com/yoannisj
+ # @package craft-order-refunds
+ #
+ #}
+
+{##
+ # Template 'order-refunds/_patials/refund-form'
+ #
+ # @var {\yoannisj\orderrefunds\models\Refund} [refund]
+ # @var {\craft\commerce\elements\Order} [order]
+ # @var {string} [id]
+ #
+ # @since 0.1.0
+ #}
+
+{% import "_includes/forms" as forms %}
+
+{% if refund is not defined and order is defined %}
+    {% set refund = create({
+        class: 'yoannisj\\orderrefunds\\models\\Refund',
+        order: order,
+    }) %}
+{% elseif order is not defined %}
+    {% set order = refund.order %}
+{% endif %}
+
+{% set id = id ?? 'refund-form-' ~ (refund.id ?: 'new') %}
+{% set fieldIdPrefix = 'refund-' ~ (refund.id ?: 'new') %}
+
+{% set isValid = refund.validate() %}
+{% set errors = refund.getErrors() %}
+
+<div id="{{ id }}" class="refund-editor-form refund-form">
+
+    {{ csrfInput() }}
+    {% if refund.id -%}
+        <input type="hidden" name="refundId" value="{{ refund.id }}" />
+    {%- endif %}
+    {% if order.id %}
+        <input type="hidden" name="orderId" value="{{ order.id }}" />
+    {% endif %}
+
+    {% if not refund.parentTransactionId %}
+        {% set refundableTransactionOptions = craft.orderRefunds.getRefundableTransactionOptions(order) %} 
+        <div class="refund-form-transaction">
+            {{ forms.selectField({
+                label: 'Refunded Transaction' | t('order-refunds'),
+                instructions: 'Select order transaction to refund' | t('order-refunds'),
+                options: refundableTransactionOptions,
+            }) }}
+        </div>
+    {% endif %}
+
+    {% set lineItemsTableData = craft.orderRefunds.getRefundLineItemsTableData(refund) %}
+    {% if lineItemsTableData.rows is not empty %}
+        <div class="refund-form-lineitems" data-attribute="lineItems">
+            <!-- =lineItemsData -->
+            {% set lineItemsTableData = craft.orderRefunds.getRefundLineItemsTableData(refund) %}
+            {{ forms.editableTableField({
+                id: fieldIdPrefix ~ '-lineitems',
+                label: 'Line Items' | t('commerce'),
+                instructions: 'Select which line items are covered by this refund' | t('order-refunds'),
+                name: lineItemsTableData.name,
+                cols: lineItemsTableData.cols,
+                rows: lineItemsTableData.rows,
+                staticRows: true,
+            }) }}
+        </div>
+    {% endif %}
+
+    {% if refund.includesShipping or craft.orderRefunds.canRefundOrderShipping(order) -%}
+        <div class="refund-form-shipping" data-attribute="includesShipping">
+            {{ forms.lightswitchField({
+                id: fieldIdPrefix ~ '-shipping',
+                label: 'Includes Shipping',
+                instructions: 'Whether this refund covers shipping costs' | t('order-refunds'),
+                name: 'includesShipping',
+                on: refund.includesShipping,
+                fieldAttributes: {
+                    class: 'refund-shipping-field field',
+                }
+            }) }}
+        </div>
+    {%- endif %}
+
+    <div class="refund-form-note">
+        {{ forms.textField({
+            id: fieldIdPrefix ~ '-note',
+            label: 'Transaction note' | t('commerce'),
+            instructions: "Add an optional note to the refund transaction" | t('order-refunds'),
+            name: 'note',
+            value: (refund.transaction.note ?? null),
+            placeholder: (refund.transaction.note ?? null),
+        }) }}
+    </div>
+
+    <div class="refund-form-totals">
+        <strong class="refund-form-itemsubtotal amount"
+            data-attribute="itemSubtotal"
+            data-label="{{ 'Item Subtotal' | t('commerce') }}"
+        >{{ refund.itemSubtotalAsCurrency }}</strong>
+        <strong class="refund-form-shippingcost amount"
+            data-attribute="totalShippingCost"
+            data-label="{{ 'Shippping Cost' | t('commerce') }}"
+        >{{ refund.totalShippingCostAsCurrency }}</strong>
+        <div class="amount-group">
+            <span class="refund-form-taxincluded amount"
+                data-attribute="totalTaxIncluded"
+                data-label="{{ 'Tax (Incl.)' | t('order-refunds') }}"
+            >{{ refund.totalTaxIncludedAsCurrency }}</span>
+            <strong class="refund-form-taxexcluded amount" data-attribute="totalTaxExcluded"
+                data-label="{{ 'Tax (Excl.)' | t('order-refunds') }}"
+            >{{ refund.totalTaxExcludedAsCurrency }}</strong>
+        </div>
+        <div class="amount-group">
+            {% if refund.transactionId -%}
+                <span class="refund-form-transactionamount amount"
+                    data-attribute="transactionAmount"
+                    data-label="{{ 'Refunded Amount' | t('commerce') }}"
+                >{{ refund.transactionAmountAsCurrency }}</span>
+            {%- endif %}
+            <strong class="refund-form-total amount {% if refund.hasErrors('total') %} error{% endif %}"
+                data-attribute="total"
+                data-label="{{ 'Total' | t('commerce') }}"
+            >{{ refund.totalPriceAsCurrency }}</strong>
+        </div>
+    </div>
+
+    <div class="refund-form-errors"{% if isValid %} style="display:none;"{% endif %}>
+        {% if not isValid -%}
+            <ul>
+                {% for attribute, attributeErrors in errors -%}
+                    <li class="refund-form-error">{{ attributeErrors | join('<br />') }}</li>
+                {%- endfor %}
+            </ul>
+        {%- endif %}
+    </div>
+
+    <div class="refund-form-actions text-right">
+        <button type="button" class="refund-cancel btn">{{ 'Cancel' | t('craft') }}</button>
+        <button type="submit" class="refund-submit btn submit formsubmit {% if not isValid %} disabled{% endif %}"
+            {% if not isValid %}disabled{% endif %}
+            data-action-url="{{ actionUrl('orderrefunds/refunds/save') }}"
+            data-confirm="{{ 'Are you sure you want to update this refund?' | t('order-refunds') }}"
+        >{{ 'Save' | t('craft') }}</button>
+    </div>
+</div>

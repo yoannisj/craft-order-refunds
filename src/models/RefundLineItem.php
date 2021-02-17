@@ -39,6 +39,12 @@ class RefundLineItem extends LineItem
     // =========================================================================
 
     /**
+     * @var bool
+     */
+
+    private $_restock = false;
+
+    /**
      * @var Refund
      */
 
@@ -60,27 +66,50 @@ class RefundLineItem extends LineItem
      * @inheritdoc
      */
 
-    public function attributes()
+    public function attributes(): array
     {
         $attributes = parent::attributes();
 
+        $attributes[] = 'restock';
         $attributes[] = 'refund';
 
         return $attributes;
     }
 
     /**
-     * Setter for the `refund` property
+     * Setter for the `restock` property
      * 
-     * @param Refund $value
+     * @param bool $restock
      */
 
-    public function setRefund( Refund $value )
+    public function setRestock( bool $restock = null )
+    {
+        $this->_restock = !!($restock);
+    }
+
+    /**
+     * Getter for the `restock` property
+     * 
+     * @return bool
+     */
+
+    public function getRestock(): bool
+    {
+        return $this->qty ? $this->_restock : false;
+    }
+
+    /**
+     * Setter for the `refund` property
+     * 
+     * @param Refund $refund
+     */
+
+    public function setRefund( Refund $refund )
     {
         $this->_refund = $refund;
 
         // force re-calculating computed properties that are affected
-        unset($this->_adjustments);
+        $this->_adjustments = null;
     }
 
     /**
@@ -91,7 +120,30 @@ class RefundLineItem extends LineItem
 
     public function getRefund(): Refund
     {
-        return $this->refund;
+        return $this->_refund;
+    }
+
+    /**
+     * The attributes on the order that should be made available as formatted currency.
+     *
+     * @return array
+     */
+
+    public function currencyAttributes(): array
+    {
+        $attributes = [];
+        $attributes[] = 'price';
+        $attributes[] = 'saleAmount';
+        $attributes[] = 'salePrice';
+        $attributes[] = 'subtotal';
+        $attributes[] = 'total';
+        $attributes[] = 'discount';
+        $attributes[] = 'shippingCost';
+        $attributes[] = 'tax';
+        $attributes[] = 'taxIncluded';
+        $attributes[] = 'adjustmentsTotal';
+
+        return $attributes;
     }
 
     // =Validation
@@ -114,6 +166,19 @@ class RefundLineItem extends LineItem
 
     // =Fields
     // -------------------------------------------------------------------------
+
+    /**
+     * @inheritdoc
+     */
+
+    public function fields(): array
+    {
+        $fields = parent::fields();
+
+        unset($fields['refund']);
+
+        return $fields;
+    }
 
     /**
      * @return OrderAdjustment

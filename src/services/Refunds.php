@@ -51,6 +51,12 @@ class Refunds extends Component
 
     private $_refundsByOrderId = [];
 
+    /**
+     * @var array
+     */
+
+    private $_refundsById = [];
+
     // =Public Methods
     // =========================================================================
 
@@ -69,16 +75,20 @@ class Refunds extends Component
             $transactions = RefundHelper::getRefundTransactions($order);
             $transactionIds = ArrayHelper::getColumn($transactions, 'id');
 
-            $refunds = [];
+            $orderRefunds = [];
             $records = RefundRecord::findAll([
                 'transactionId' => $transactionIds
             ]);
     
-            foreach ($records as $record) {
-                $refunds[] = new Refund($record->getAttributes());
+            foreach ($records as $record)
+            {
+                $refund = new Refund($record->getAttributes());
+
+                $this->_refundsById[$refund->id] = $refund;
+                $orderRefunds[] = $refund;
             }
-    
-            $this->_refundsByOrderId[$order->id] = $refunds;
+
+            $this->_refundsByOrderId[$order->id] = $orderRefunds;
         }
 
         return $this->_refundsByOrderId[$order->id];
@@ -101,6 +111,33 @@ class Refunds extends Component
     }
 
     /**
+     * Returns refund for given id
+     * 
+     * @param int $id
+     * 
+     * @return Refund|null
+     */
+
+    public function getRefundById( int $id )
+    {
+        if (!array_key_exists($id, $this->_refundsById))
+        {
+            $refund = null;
+            $record = RefundRecord::findOne($id);
+
+            if ($record)
+            {
+                $refund = new Refund();
+                $refund->setAttributes($record->getAttributes());
+            }
+
+            $this->_refundsById[$id] = $refund;
+        }
+
+        return $this->_refundsById[$id];
+    }
+
+    /**
      * Saves a refund to the database
      * 
      * @param Refund $refund
@@ -112,10 +149,10 @@ class Refunds extends Component
     {
         $isNewRefund = !$refund->id;
 
-        if ($isNewRefund) { // refunds are immutable
-            throw new InvalidArgumentException(
-                'Can not modify existing refund with ID '.$refund->id);
-        }
+        // if ($isNewRefund) { // refunds are immutable
+        //     throw new InvalidArgumentException(
+        //         'Can not modify existing refund with ID '.$refund->id);
+        // }
 
         // make sure refund has a reference
         if (empty($refund->reference))
@@ -140,6 +177,7 @@ class Refunds extends Component
         {
             Craft::info(('Refund not saved due to validation error: ' .
                 print_r($refund->errors, true)), __METHOD__);
+
             return false;
         }
 

@@ -156,24 +156,9 @@ class OrderRefunds extends Plugin
         $view->registerAssetBundle(RefundsEditorBundle::class);
 
         // render html for edit UI
-        $html = $view->renderTemplate('order-refunds/refunds-editor', [
+        $html = $view->renderTemplate('order-refunds/order-refunds', [
             'order' => $order
         ]);
-
-        $view->registerJs('
-            // get order refunds container
-            var $orderRefunds = $("#order-refunds");
-
-            // initialize refund editors
-            $orderRefunds.find(".refund-editor").each(function() {
-                var $editor = $(this);
-                $editor.data("refundEditor", new RefundEditor($editor));
-            });
-
-            // move order refunds to transactions tab, and show them
-            $("#transactionsTab").append($orderRefunds);
-            $orderRefunds.show().removeClass("hide").removeAttr("hidden");
-        ');
 
         return $html;
     }

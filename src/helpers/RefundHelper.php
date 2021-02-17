@@ -12,6 +12,8 @@
 
 namespace yoannisj\orderrefunds\helpers;
 
+use yii\base\InvalidArgumentException;
+
 use Craft;
 use craft\helpers\ArrayHelper;
 
@@ -20,7 +22,7 @@ use craft\commerce\models\LineItem;
 use craft\commerce\elements\Order;
 
 use yoannisj\orderrefunds\OrderRefunds;
-use yoannis\orderrefunds\models\Refund;
+use yoannisj\orderrefunds\models\Refund;
 
 /**
  * Class with static helper methods to work with Refunds
@@ -32,6 +34,58 @@ class RefundHelper
 {
     // =Public Methods
     // =========================================================================
+
+    /**
+     * Creates a Refund model based on given parameters
+     * 
+     * @param array $params Parameters used to create the Refund model
+     *
+     * @return Refund
+     * 
+     * @throws InvalidArgumentException If params contain a refund id but no corresponding refund exists
+     */
+
+    public static function createRefundForParams( array $params ): Refund
+    {
+        // 1. optionally scope params to refund id
+        $refundId = $params['refundId'] ?? null;
+
+        $config = null;
+        if ($refundId) $config = $params[$refundId] ?? null;
+        if (!$config) $config = $params['refund'] ?? $params;
+
+        // 2. retrieve existing refund based on id, or create new one
+        if ($refundId)
+        {
+            $refund = OrderRefunds::$plugin->getRefunds()->getRefundById($refundId);
+
+            if (!$refund)
+            {
+                throw new InvalidArgumentException(Craft::t(
+                    'order-refunds',
+                    'Could not find refund with given ID `{id}`',
+                    [ 'id' => $refundId ]
+                ));
+            }
+        }
+
+        else {
+            $refund = new Refund();
+        }
+
+        // 3. set attributes from config
+        $refund->setAttributes($config);
+
+        // 4. set other configurable properties from config
+        // -> order id can be given in refund config or as global param
+        $orderId = $config['orderId'] ?? $params['orderId'] ?? null;
+        if ($orderId) $refund->orderId = $orderId;
+
+        $parentTransactionId = $config['parentTransactionId'] ?? null;
+        if ($parentTransactionId) $refund->parentTransactionId = $parentTransactionId;
+
+        return $refund;
+    }
 
     /**
      * Returns list of refund transactions for given Order

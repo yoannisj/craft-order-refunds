@@ -22,6 +22,7 @@ use craft\commerce\Plugin as Commerce;
 use craft\commerce\models\Transaction;
 use craft\commerce\records\TaxRate as TaxRateRecord;
 use craft\commerce\elements\Order;
+use craft\commerce\behaviors\CurrencyAttributeBehavior;
 
 use yoannisj\orderrefunds\OrderRefunds;
 use yoannisj\orderrefunds\models\RefundLineItem;
@@ -32,6 +33,16 @@ use yoannisj\orderrefunds\helpers\AdjustmentHelper;
  * Model representing an order refund
  * 
  * @since 0.1.0
+ * 
+ * @prop read-only itemSubtotalAsCurrency
+ * @prop read-only totalAdjustmentsAsCurrency
+ * @prop read-only totalShippingCostAsCurrency
+ * @prop read-only totalTaxAsCurrency
+ * @prop read-only totalTaxIncludedAsCurrency
+ * @prop read-only totalTaxExcluded
+ * @prop read-only totalAsCurrency
+ * @prop read-only totalPriceAsCurrency
+ * @prop read-only transactionAmountAsCurrency
  * 
  * @todo Support arbitrary compensations in refunds
  */
@@ -137,6 +148,26 @@ class Refund extends Model
     // =Public Methods
     // =========================================================================
 
+    /**
+     * @inheritdoc
+     */
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+
+        $defaultCurrency = ($this->getTransactionCurrency() ?? Commerce::getInstance()
+            ->getPaymentCurrencies()->getPrimaryPaymentCurrencyIso());
+
+        $behaviors['currencyAttributes'] = [
+            'class' => CurrencyAttributeBehavior::class,
+            'defaultCurrency' => $defaultCurrency,
+            'currencyAttributes' => $this->currencyAttributes()
+        ];
+
+        return $behaviors;
+    }
+
     // =Attributes
     // -------------------------------------------------------------------------
 
@@ -216,9 +247,13 @@ class Refund extends Model
     {
         $rules = parent::rules();
 
-        $rules['attrRequired'] = [ ['transactionId', 'reference'], 'required' ];
+        $rules['attrRequired'] = [ ['transactionId', 'reference'], 'required',
+            'when' => function($model) {
+                return !empty($model->id);
+            }
+        ];
 
-        $rules['attrBoolean'] = [ ['includesAllLineItems', 'includesShipping'], 'boolean' ];
+        $rules['attrBoolean'] = [ ['includesShipping'], 'boolean' ];
         $rules['attrArray'] = [ ['lineItemsData'], ArrayValidator::class ];
         $rules['attrId'] = [ ['transactionId'], 'integer', 'min' => 1 ];
 
@@ -291,11 +326,13 @@ class Refund extends Model
             'total',
             function(string $attribute, $params, InlineValidator $validator, $value)
             {
-                $transaction = $this->getTransaction();
-                if ($transaction && $transaction->amount != $this->getTotal())
-                {
+                if ($this->transactionId
+                    && $this->getTransactionAmount() != $value
+                ) {
                     $validator->addError($this, $attribute, Craft::t('order-refunds',
-                        '{attribute} must match the refund transaction amount.'));
+                        '{attribute} must match the refund transaction amount of {amount}.',
+                        [ 'amount' => $this->transactionAmountAsCurrency ],
+                    ));
                 }
             },
             'when' => function($model) {
@@ -313,6 +350,25 @@ class Refund extends Model
      * @inheritdoc
      */
 
+    public function currencyAttributes()
+    {
+        return [
+            'itemSubtotal',
+            'adjustmentsTotal',
+            'totalShippingCost',
+            'totalTax',
+            'totalTaxIncluded',
+            'totalTaxExcluded',
+            'total',
+            'totalPrice',
+            'transactionAmount',
+        ];
+    }
+
+    /**
+     * @inheritdoc
+     */
+
     public function fields()
     {
         $fields = parent::fields();
@@ -320,8 +376,9 @@ class Refund extends Model
         $fields[] = 'orderId';
         $fields[] = 'parentTransactionId';
         $fields[] = 'transactionDate';
-        $fields[] = 'transactionCurrency';
         $fields[] = 'transactionNote';
+        $fields[] = 'transactionAmount';
+        $fields[] = 'transactionCurrency';
 
         $fields[] = 'lineItems';
         $fields[] = 'totalQty';
@@ -332,10 +389,20 @@ class Refund extends Model
         $fields[] = 'totalShippingCost';
         $fields[] = 'totalTax';
         $fields[] = 'totalTaxIncluded';
+        $fields[] = 'totalTaxExcluded';
         $fields[] = 'adjustmentsTotal';
 
         $fields[] = 'total';
         $fields[] = 'totalPrice';
+
+        // include currency fields
+        $currAttrBehavior = $this->getBehavior('currencyAttributes');
+        if ($currAttrBehavior)
+        {
+            $fields = array_merge($fields,
+                $currAttrBehavior->currencyFields()
+            );
+        }
 
         return $fields;
     }
@@ -516,13 +583,32 @@ class Refund extends Model
     }
 
     /**
+     * @return float
+     */
+
+    public function getTransactionAmount(): float
+    {
+        $transaction = $this->getTransaction();
+        return ($transaction ? $transaction->amount : 0);
+    }
+
+    /**
      * @return string | null
      */
 
     public function getTransactionCurrency()
     {
         $transaction = $this->getTransaction();
-        return $transaction ? $transaction->paymentCurrency : null;
+        if ($transaction) {
+            return $transaction->currency;
+        }
+
+        $order = $this->getOrder();
+        if ($order) {
+            return $order->paymentCurrency;
+        }
+
+        return null;
     }
 
     /**
@@ -628,8 +714,11 @@ class Refund extends Model
     {
         $total = 0;
 
-        foreach ($this->getAdjustments() as $adjustment) {
-            $total += $adjustment->amount;
+        foreach ($this->getAdjustments() as $adjustment)
+        {
+            if (!$adjustment->included) {
+                $total += $adjustment->amount;
+            }
         }
 
         return $total;
@@ -671,7 +760,8 @@ class Refund extends Model
                 $total += $adjustment->amount;
             }
         }
-        return 0;   
+
+        return $total;
     }
 
     /**
@@ -695,12 +785,32 @@ class Refund extends Model
     }
 
     /**
+     * Returns excluded tax amount
+     * 
+     * @return float
+     */
+
+    public function getTotalTaxExcluded(): float
+    {
+        $total = 0;
+
+        foreach ($this->getAdjustments() as $adjustment)
+        {
+            if ($adjustment->type == 'tax' && !$adjustment->included) {
+                $total += $adjustment->amount;
+            }
+        }
+
+        return $total;
+    }
+
+    /**
      * @return float
      */
 
     public function getTotal(): float
     {
-        return $this->getItemSubtotal() + $this->getAdjustmentsTotal();
+        return ($this->getItemSubtotal() + $this->getAdjustmentsTotal());
     }
 
     /**
@@ -729,15 +839,33 @@ class Refund extends Model
 
         foreach ($order->getLineItems() as $lineItem)
         {
+            // get refunded qty for line item
             $refundQty = ($lineItemsData[$lineItem->id]['qty'] ?? 0);
+            $restock = ($lineItemsData[$lineItem->id]['restock'] ?? false);
 
             // leave out line items that are not included by refund
             if ($refundQty <= 0) continue;
 
-            $config = $lineItem->getAttributes();
-            $config['qty'] = $refundQty;
+            // get order line item attributes
+            $attributes = $lineItem->getAttributes();
+            // -> remove read-only attributes
+            unset($attributes['adjustments']);
+            unset($attributes['total']);
+            unset($attributes['onSale']);
+            unset($attributes['optionsSignature']);
 
-            $lineItems[] = new RefundLineItem($config);
+            // create refund line item by transferring attributes
+            $refundLineItem = new RefundLineItem();
+            $refundLineItem->setAttributes($attributes);
+
+            // update attributes to reflect refund's lineItemData
+            $refundLineItem->qty = $refundQty;
+            $refundLineItem->restock = $restock;
+
+            // associate refund line item to this Refund
+            $refundLineItem->setRefund($this);
+
+            $lineItems[] = $refundLineItem;
         }
 
         return $lineItems;

@@ -1,0 +1,59 @@
+{##
+ # Order Refunds plugin for Craft CMS 3.x
+ #
+ # Detailed refunds for Craft Commerce orders
+ #
+ # @author Yoannis Jamar
+ # @copyright Copyright (c) 2017 Yoannis Jamar
+ # @link https://github.com/yoannisj
+ # @package craft-order-refunds
+ #
+ #}
+
+{##
+ # Template 'order-refunds/order-refunds'
+ #
+ # @var {\craft\commerce\elements\Order} order
+ #
+ # @since 0.1.0
+ #}
+
+{% import "_includes/forms" as forms %}
+
+{% set refunds = craft.orderRefunds.getRefundsForOrder(order) %}
+{% set refundableTransactions = craft.orderRefunds.getRefundableTransactions(order) %}
+
+<div id="order-refunds" class="refunds" style="display: none;">
+
+    {% if refunds is not empty %}
+        {% for refund in refunds %}
+            <hr />
+            {% include 'order-refunds/_partials/refund-editor' with {
+                refund: refund,
+            } only %}
+        {% endfor %}
+    {% endif %}
+
+    {% if refundableTransactions is not empty %}
+
+        <hr />
+
+        <div class="refund refund-editor">
+            <div class="refund-main refund-main--new" role="presentation">
+
+                <div class="refund-summary">
+                    <div class="refund-summary-controls text-right">
+                        <a class="refund-create btn" href="#new-refund-form">{{ 'New Refund' | t('order-refunds') }}</a>
+                    </div>
+                </div>
+
+                {% include 'order-refunds/_partials/refund-form' with {
+                    order: order,
+                    id: 'new-refund-form',
+                } only %}
+
+            </div>
+        </div>
+
+    {% endif %}
+</div>

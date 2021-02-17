@@ -13,6 +13,7 @@
 namespace yoannisj\orderrefunds\assets;
 
 use Craft;
+use craft\web\View;
 use craft\web\AssetBundle;
 use craft\web\assets\cp\CpAsset as CraftCpAsset;
 
