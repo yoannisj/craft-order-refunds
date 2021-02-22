@@ -104,6 +104,11 @@ class OrderRefunds extends Plugin
         );
 
         // Redirect to plugin settings after installation
+        // @todo: redirect to a "setup" screen in CP where user can choose
+        // the reference format and update refund records for all existing
+        // transactions
+        // @todo: don't show "new refund" button on order edit CP
+        // until all existing refund transactions were updated
         Event::on(
             Plugins::class,
             Plugins::EVENT_AFTER_INSTALL_PLUGIN,
@@ -120,7 +125,7 @@ class OrderRefunds extends Plugin
         // Load order refunds on Order edit screen
         Craft::$app->getView()->hook(
             'cp.commerce.order.edit.main-pane',
-            [ $this, 'getOrderRefundsHtml' ]
+            [$this, 'getOrderRefundsHtml']
         );
 
         Craft::info(Craft::t('order-refunds', '{name} plugin initialized', [
@@ -147,7 +152,12 @@ class OrderRefunds extends Plugin
 
     public function getOrderRefundsHtml( array &$context )
     {
+        if (!Craft::$app->getUser()->checkPermission('commerce-refundPayment')) {
+            return '';
+        }
+
         $order = $context['order'] ?? null;
+
         if (!$order) return '';
 
         $view = Craft::$app->getView();

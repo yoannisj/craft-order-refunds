@@ -20,7 +20,10 @@ use craft\web\Controller;
 use craft\web\Request;
 use craft\web\Response;
 
+use craft\commerce\errors\RefundException;
+
 use yoannisj\orderrefunds\OrderRefunds;
+use yoannisj\orderrefunds\models\Refund;
 use yoannisj\orderrefunds\helpers\RefundHelper;
 
 /**
@@ -56,21 +59,42 @@ class RefundsController extends Controller
     public function actionCalculate( array $params = null ): Response
     {
         $this->requirePostRequest();
+        $this->requirePermission('commerce-refundPayment');
 
         $request = Craft::$app->getRequest();
         $params = $params ?? $request->getBodyParams();
 
-        $refund = $this->createRefundForParams($params);
-        $isValid = $refund->validate();
-        $validationErrors = $refund->getErrors();
+        $refund = null;
 
-        return $this->createResponse($request, [
-            'params' => $params,
-            'refund' => $refund,
-            'success' => true,
-            'isValid' => $isValid,
-            'validationErrors' => $validationErrors,
-        ]);
+        try
+        {
+            $refund = RefundHelper::buildRefundFromParams($params);
+            $refund->scenario = Refund::SCENARIO_CALCULATE;
+    
+            $isValid = $refund->validate();
+            $validationErrors = $refund->getErrors();
+    
+            return $this->buildSuccessResponse($request, [
+                'params' => $params,
+                'success' => true,
+                'successMessage' => null,
+                'refund' => $refund,
+                'isValid' => $isValid,
+                'validationErrors' => $validationErrors,
+            ]);
+        }
+
+        catch (\Throwable $exception)
+        {
+            $error = $exception->getMessage();
+
+            Craft::error($error, 'order-refunds');
+            Craft::$app->getErrorHandler()->logException($exception);
+
+            return $this->buildErrorResponse($request, $error, [
+                'refund' => $refund,
+            ]);
+        }
     }
 
     /**
@@ -84,49 +108,65 @@ class RefundsController extends Controller
     public function actionSave( array $params = null ): Response
     {
         $this->requirePostRequest();
+        $this->requirePermission('commerce-refundPayment');
 
         $request = Craft::$app->getRequest();
         $params = $params ?? $request->getBodyParams();
 
-        $refund = $this->createRefundForParams($params);
-        $success = OrderRefunds::$plugin->getRefunds()->saveRefund($refund);
-        $isValid = $refund->hasErrors();
-        $validationErrors = $refund->getErrors();
+        $refund = null;
 
-        return $this->createResponse($request, [
-            'params' => $params,
-            'refund' => $refund,
-            'success' => $success,
-            'isValid' => $isValid,
-            'validationErrors' => $validationErrors,
-        ]);
+        try
+        {
+            $refund = RefundHelper::buildRefundFromParams($params);
+            $success = OrderRefunds::$plugin->getRefunds()->saveRefund($refund);
+            $isValid = $refund->hasErrors();
+
+            if (!$success)
+            {
+                $error = Craft::t('order-refunds', "Could not save refund");
+                if (!$isValid)
+                {
+                    $error = Craft::t('order-refunds', "Refund is not valid: {error}", [
+                        'error' => $refund->getFirstError(),
+                    ]);
+                }
+
+                return $this->buildErrorResponse($request, $error, [
+                    'params' => $params,
+                    'refund' => $refund,
+                ]);
+            }
+
+            return $this->buildSuccessResponse($request, [
+                'params' => $params,
+                'success' => $success,
+                'successMessage' => Craft::t('order-refunds', "Refund saved"),
+                'refund' => $refund,
+                'isValid' => $isValid,
+                'errors' => $refund->getErrors(),
+            ]);
+        }
+
+        catch (\Throwable $exception)
+        {
+            Craft::error($exception->getMessage(), 'order-refunds');
+            Craft::$app->getErrorHandler()->logException($exception);
+
+            $error = Craft::t('order-refunds', "Could not save refund");
+
+            if ($exception instanceof RefundException) {
+                $error = $exception->getMessage();
+            }
+
+            return $this->buildErrorResponse($request, $error, [
+                'params' => $params,
+                'refund' => $refund,
+            ]);
+        }
     }
 
     // =Protected Methods
     // =========================================================================
-
-    /**
-     * Creates a Refund model based on given parameters
-     * 
-     * @param array $params
-     * 
-     * @return Refund|null
-     * 
-     * @throws NotFoundHttpException If params contain a refund id but no corresponding refund exists
-     */
-
-    protected function createRefundForParams( array $params )
-    {
-        $refund = null;
-
-        try {
-            $refund = RefundHelper::createRefundForParams($params);       
-        } catch (InvalidArgumentException $exception) {
-            throw new NotFoundHttpException($exception->getMessage());
-        }
-
-        return $refund;
-    }
 
     /**
      * @param Request $request
@@ -135,7 +175,7 @@ class RefundsController extends Controller
      * @return Response
      */
 
-    protected function createResponse( Request $request, array $data = [] ): Response
+    protected function buildSuccessResponse( Request $request, array $data = [] ): Response
     {
         // add request action to returned data
         if (!isset($data['action']))
@@ -149,9 +189,31 @@ class RefundsController extends Controller
             return $this->asJson($data);
         }
 
+        $this->setSuccessFlash($data['successMessage'] ?? null);
+
         // set response data and optionally redirect
-        $response->data = $data;
+        // Craft::$app->getResponse()->data = $data;
+
         // pass in data to redirect url object template
-        $this->redirectToPostelUrl($data);
+        return $this->redirectToPostedUrl($data);
+    }
+
+    /**
+     * @param Request $request
+     * @param string $error
+     * 
+     * @return Response
+     */
+
+    protected function buildErrorResponse( Request $request, string $error, array $data = [] ): Response
+    {
+        if ($request->getAcceptsJson()) {
+            return $this->asErrorJson($error);
+        }
+
+        $this->setFailFlash($error);
+
+        // pass in data to redirect url object template
+        return $this->redirectToPostedUrl($data);
     }
 }

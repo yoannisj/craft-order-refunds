@@ -45,16 +45,22 @@ class RefundHelper
      * @throws InvalidArgumentException If params contain a refund id but no corresponding refund exists
      */
 
-    public static function createRefundForParams( array $params ): Refund
+    public static function buildRefundFromParams( array $params ): Refund
     {
-        // 1. optionally scope params to refund id
-        $refundId = $params['refundId'] ?? null;
-
+        // 1. build refund config from params
         $config = null;
-        if ($refundId) $config = $params[$refundId] ?? null;
-        if (!$config) $config = $params['refund'] ?? $params;
 
-        // 2. retrieve existing refund based on id, or create new one
+        // -> optionally scope config in params with refund id
+        $refundId = $params['refundId'] ?? null;
+        if ($refundId) $config = $params[$refundId] ?? null;
+
+        // -> optionally scope config in 'refund' key
+        if (!$config) $config = $params['refund'] ?? $params;        
+
+        // -> `refundId` could be scoped in 'refund'
+        if (!$refundId) $refundId = $config['id'] ?? null;
+
+        // 2.a) retrieve existing refund, based on given refund id
         if ($refundId)
         {
             $refund = OrderRefunds::$plugin->getRefunds()->getRefundById($refundId);
@@ -69,20 +75,30 @@ class RefundHelper
             }
         }
 
+        // 2.b) or create new one
         else {
             $refund = new Refund();
         }
 
         // 3. set attributes from config
-        $refund->setAttributes($config);
+        $refund->setAttributes($config, true);
 
         // 4. set other configurable properties from config
+        // (i.e. not saved in a db column, but involved in computations)
+
         // -> order id can be given in refund config or as global param
         $orderId = $config['orderId'] ?? $params['orderId'] ?? null;
         if ($orderId) $refund->orderId = $orderId;
 
         $parentTransactionId = $config['parentTransactionId'] ?? null;
         if ($parentTransactionId) $refund->parentTransactionId = $parentTransactionId;
+
+        // -> note can only be overriden if refund has no transaction yet
+        if (!$refund->transactionId)
+        {
+            $note = $config['note'] ?? null;
+            if ($note) $refund->note = $note;
+        }
 
         return $refund;
     }
@@ -185,5 +201,31 @@ class RefundHelper
         }
 
         return true;
+    }
+
+    /**
+     * Checks whether given line item is restockable
+     * 
+     * @return bool
+     */
+
+    public static function isRestockableLineItem( LineItem $lineItem ): bool
+    {
+        if ($lineItem->qty == 0) return false;
+
+        $purchasable = $lineItem->getPurchasable();
+        if (!$purchasable) return false;
+
+        if ($purchasable->canGetProperty('hasUnlimitedStock')
+            && $purchasable->hasUnlimitedStock
+        ) {
+            return false;
+        }
+
+        else if ($purchasable->canGetProperty('stock')) {
+            return true;
+        }
+
+        return false;
     }
 }

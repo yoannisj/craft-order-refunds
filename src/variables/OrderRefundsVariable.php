@@ -171,7 +171,7 @@ class OrderRefundsVariable extends Refunds
                 'class' => 'refund-item-qty',
             ],
             'restock' => [
-                'type' => 'lightswitch',
+                'type' => 'html',
                 'heading' => Craft::t('commerce', 'Restock'),
                 'order' => 4,
                 'class' => 'refund-item-restock',
@@ -187,7 +187,6 @@ class OrderRefundsVariable extends Refunds
 
             $refundLineItem = ArrayHelper::firstWhere($refundLineItems, 'id', $lineItemId);
             $refundQty = $refundLineItem ? $refundLineItem->qty : 0;
-            $restock = $refundLineItem ? $refundLineItem->restocked : false;
 
             // include this refund's line item quantity back into refundable quantity
             $refundableQty += $refundQty;
@@ -205,14 +204,38 @@ class OrderRefundsVariable extends Refunds
                 'class' => 'refund-item-qty-input'
             ]).'<small class="extralight">/&thinsp;'.$refundableQty.'</small>';
 
+            // get restock data for line item
+            $canRestock = RefundHelper::isRestockableLineItem($lineItem);
+            $restockableQty = 0;
+            $restock = false;
+
+            if ($canRestock)
+            {
+                if ($refundLineItem) {
+                    $refundableQty = $refundLineItem->getRestockableQty();
+                    $restock = $refundLineItem->restock;
+                } else {
+                    $refundableQty = $lineItem->qty;
+                }
+            }
+
+            $restockHtml = '<span class="extralight">n/a</span>';
+            if ($canRestock)
+            {
+                $restockHtml = $view->renderTemplate('_includes/forms/lightswitch', [
+                    'name' => 'lineItemsData['.$lineItemId.'][restock]',
+                    'on' => $restock,
+                    'value' => 1,
+                    'small' =>  true,
+                    'disabled' => ($refundableQty == 0),
+                ]);
+            }
+
             $rows[$lineItemId] = [
                 'description' => $lineItem->description,
                 'salePrice' => $lineItem->salePriceAsCurrency,
                 'qty' => $qtyHtml,
-                'restock' => [
-                    'value' => $restock,
-                    'static' => ($refundQty == 0), // will disable the lightswitch
-                ],
+                'restock' => $restockHtml,
             ];
         }
 

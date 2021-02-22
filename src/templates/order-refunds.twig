@@ -47,8 +47,14 @@
                     </div>
                 </div>
 
-                {% include 'order-refunds/_partials/refund-form' with {
+                {% set refund = create({
+                    class: 'yoannisj\\orderrefunds\\models\\Refund',
+                    scenario: constant('yoannisj\\orderrefunds\\models\\Refund::SCENARIO_CALCULATE'),
                     order: order,
+                }) %}
+
+                {% include 'order-refunds/_partials/refund-form' with {
+                    refund: refund,
                     id: 'new-refund-form',
                 } only %}
 

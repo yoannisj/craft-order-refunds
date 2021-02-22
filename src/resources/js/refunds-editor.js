@@ -47,6 +47,8 @@
             this.$form = this.$form.find('form');
         }
 
+        this.form = this.$form.get(0);
+
         this.$lineItemRows = this.$form.find('.refund-form-lineitems tbody tr');
         this.$itemSubtotal = this.$form.find('.refund-form-itemsubtotal');
         this.$shippingCost = this.$form.find('.refund-form-shippingcost');
@@ -89,6 +91,8 @@
 
         this.$container.on('click.refund-editor', '.refund-shipping-field .lightswitch',
             $.proxy(this.onRefundChange, this));
+
+        this.$form.on('submit.refund-editor', $.proxy(this.onFormSubmit, this));
     };
 
     /**
@@ -160,13 +164,18 @@
 
         this.$container.addClass('is-calculating');
 
-        console.log('RefundEditor::calculate()');
-    
-        var params = this.$form.serializeArray();
+        // get serialized form params
+        var params = this.$form.serializeArray()
+            .filter(function(param) { // remove 'action' params
+                return (param.name != 'action');
+            });
+
         params.push({
             name: 'action',
             value: 'order-refunds/refunds/calculate'
         });
+
+        console.log('RefundEditor::calculate()', params);
 
         $.ajax({
             url: '/index.php',
@@ -223,6 +232,20 @@
             else {
                 console.log('change!');
                 this.calculate();
+            }
+        }
+    };
+
+    RefundEditor.prototype.onFormSubmit = function(ev)
+    {
+        var $ctrl = $(ev.originalEvent.submitter),
+            confirmationMessage = $ctrl.data('confirmMessage') || this.$form.data('confirmMessage');
+
+        if (confirmationMessage != '' )
+        {
+            ev.preventDefault();
+            if (confirm(confirmationMessage)) {
+                this.form.submit(); // won't trigger submit event again
             }
         }
     };
@@ -284,7 +307,7 @@
 
         else {
             this.$errors.html('').hide();
-            this.$submit.enable();
+            this.$submit.removeAttr('disabled').enable();
         }
     };
 

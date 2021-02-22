@@ -22,7 +22,9 @@
     <header class="refund-header">
         <h3 class="refund-title">{{ refund.reference }}</h3>
         <p class="refund-caption extralight">{{ refund.transactionDate | date }}</p>
-        <button type="button" class="refund-edit btn-link btn-link-default">{{ 'Edit' | t('craft') }}</button>
+        {% if refund.isRevisable %}
+            <button type="button" class="refund-edit btn-link btn-link-default">{{ 'Edit' | t('craft') }}</button>
+        {% endif %}
     </header>
 
     <div class="refund-main" role="presentation">
@@ -38,6 +40,7 @@
                         {%- else -%}
                             {%- for lineItem in refund.lineItems -%}
                                 {{- lineItem.description }}: <span class="code">{{ lineItem.qty }}</span>
+                                {%- if not loop.last %}, {% endif -%}
                             {%- endfor -%}
                         {%- endif -%}
                     </span>
@@ -52,7 +55,11 @@
                 <!-- =note -->
                 <li class="refund-summary-note">
                     <strong>{{ 'Refund Note' | t('commerce') }}:</strong>
-                    <br/><span>{{ refund.transactionNote }}</span>
+                    {%- if refund.note is not empty -%}
+                        <br/><span>{{ refund.note }}</span>
+                    {% else %}
+                        <br/><small class="extralight">n/a</small>
+                    {% endif %}
                 </li>
 
                 <!-- =amount -->
@@ -63,9 +70,11 @@
             </ul>
         </div>
 
-        {% include 'order-refunds/_partials/refund-form' with {
-            refund: refund,
-        } only %}
+        {% if refund.isRevisable %}
+            {% include 'order-refunds/_partials/refund-form' with {
+                refund: refund,
+            } only %}
+        {% endif %}
 
     </div>
 

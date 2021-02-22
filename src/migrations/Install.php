@@ -95,6 +95,8 @@ class Install extends Migration
                 'reference' => $this->string()->notNull(),
                 'lineItemsData' => $this->json(),
                 'includesShipping' => $this->boolean()->defaultValue(false),
+                'restockedQuantities' => $this->json(),
+                'isRevisable' => $this->boolean()->defaultValue(false),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
@@ -129,7 +131,7 @@ class Install extends Migration
 
         // create missing Refund records for each refund transaction
         $view = Craft::$app->getView();
-        $template = OrderRefunds::$plugin->getSettings()->refundReferenceTemplate;
+        $refTemplate = OrderRefunds::$plugin->getSettings()->refundReferenceTemplate;
 
         foreach ($transactions as $transaction)
         {
@@ -138,21 +140,24 @@ class Install extends Migration
             $record = RefundRecord::findOne($config);
             $model = new Refund($config);
 
-            // transfer model attributes to record or vice-versa
-            if (!$record) {
+            // transfer record attributes to model or vice-versa
+            if ($record) {
+                $model->setAttributes($record->getAttributes());
+            } else {
+                // refunds created upon install are revisable
+                $model->isRevisable = true;
+
                 $record = new RefundRecord();
                 $record->setAttributes($model->getAttributes(), false);
-            } else {
-                $model->setAttributes($record->getAttributes());
             }
 
             // give each refund record a reference
-            if (empty($record->reference))
-            {
-                $record->reference = $view->renderObjectTemplate($template, $model);
-                // save record
-                $record->save();
+            if (empty($record->reference)) {
+                $record->reference = $view->renderObjectTemplate($refTemplate, $model);
             }
+
+            // save record
+            $record->save();
         }
     }
 }

@@ -13,8 +13,7 @@
 {##
  # Template 'order-refunds/_patials/refund-form'
  #
- # @var {\yoannisj\orderrefunds\models\Refund} [refund]
- # @var {\craft\commerce\elements\Order} [order]
+ # @var {\yoannisj\orderrefunds\models\Refund} refund
  # @var {string} [id]
  #
  # @since 0.1.0
@@ -22,36 +21,34 @@
 
 {% import "_includes/forms" as forms %}
 
-{% if refund is not defined and order is defined %}
-    {% set refund = create({
-        class: 'yoannisj\\orderrefunds\\models\\Refund',
-        order: order,
-    }) %}
-{% elseif order is not defined %}
-    {% set order = refund.order %}
-{% endif %}
-
 {% set id = id ?? 'refund-form-' ~ (refund.id ?: 'new') %}
 {% set fieldIdPrefix = 'refund-' ~ (refund.id ?: 'new') %}
 
 {% set isValid = refund.validate() %}
 {% set errors = refund.getErrors() %}
 
+{% set confirmMessage = (refund.id ?
+    "Are you sure you want to update this refund?" :
+    "Are you sure you want to refund this transaction?") | t('order-refunds') %}
+
 <div id="{{ id }}" class="refund-editor-form refund-form">
 
     {{ csrfInput() }}
+    {{ actionInput('order-refunds/refunds/save') }}
+
     {% if refund.id -%}
         <input type="hidden" name="refundId" value="{{ refund.id }}" />
     {%- endif %}
-    {% if order.id %}
-        <input type="hidden" name="orderId" value="{{ order.id }}" />
-    {% endif %}
+    {% if refund.orderId %}
+        <input type="hidden" name="orderId" value="{{ refund.orderId }}" />
+    {%- endif %}
 
     {% if not refund.parentTransactionId %}
-        {% set refundableTransactionOptions = craft.orderRefunds.getRefundableTransactionOptions(order) %} 
+        {% set refundableTransactionOptions = craft.orderRefunds.getRefundableTransactionOptions(refund.order) %} 
         <div class="refund-form-transaction">
             {{ forms.selectField({
                 label: 'Refunded Transaction' | t('order-refunds'),
+                name: 'parentTransactionId',
                 instructions: 'Select order transaction to refund' | t('order-refunds'),
                 options: refundableTransactionOptions,
             }) }}
@@ -75,7 +72,7 @@
         </div>
     {% endif %}
 
-    {% if refund.includesShipping or craft.orderRefunds.canRefundOrderShipping(order) -%}
+    {% if refund.includesShipping or craft.orderRefunds.canRefundOrderShipping(refund.order) -%}
         <div class="refund-form-shipping" data-attribute="includesShipping">
             {{ forms.lightswitchField({
                 id: fieldIdPrefix ~ '-shipping',
@@ -91,6 +88,7 @@
     {%- endif %}
 
     <div class="refund-form-note">
+        {% set disabled = refund.transactionId ? true : false %}
         {{ forms.textField({
             id: fieldIdPrefix ~ '-note',
             label: 'Transaction note' | t('commerce'),
@@ -98,6 +96,7 @@
             name: 'note',
             value: (refund.transaction.note ?? null),
             placeholder: (refund.transaction.note ?? null),
+            disabled: disabled,
         }) }}
     </div>
 
@@ -145,10 +144,9 @@
 
     <div class="refund-form-actions text-right">
         <button type="button" class="refund-cancel btn">{{ 'Cancel' | t('craft') }}</button>
-        <button type="submit" class="refund-submit btn submit formsubmit {% if not isValid %} disabled{% endif %}"
+        <button type="submit" class="refund-submit btn submit {% if not isValid %} disabled{% endif %}"
             {% if not isValid %}disabled{% endif %}
-            data-action-url="{{ actionUrl('orderrefunds/refunds/save') }}"
-            data-confirm="{{ 'Are you sure you want to update this refund?' | t('order-refunds') }}"
+            data-confirm-message="{{ confirmMessage }}"
         >{{ 'Save' | t('craft') }}</button>
     </div>
 </div>

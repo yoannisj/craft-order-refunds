@@ -16,6 +16,7 @@ use yii\validators\InlineValidator;
 
 use Craft;
 use craft\base\Model;
+use craft\helpers\ArrayHelper;
 
 use craft\commerce\Plugin as Commerce;
 use craft\commerce\models\LineItem;
@@ -23,9 +24,15 @@ use craft\commerce\elements\Order;
 
 use yoannisj\orderrefunds\OrderRefunds;
 use yoannisj\orderrefunds\models\Refund;
+use yoannisj\orderrefunds\helpers\RefundHelper;
 
 /**
  * Model representing a line item in an order refund
+ * 
+ * @prop read-only {bool} canRestock
+ * @prop read-only {int} restockedQty
+ * @prop read-only {int} restockableQty
+ * @prop read-only {int} qtyToRestock
  * 
  * @since 0.1.0
  */
@@ -42,7 +49,7 @@ class RefundLineItem extends LineItem
      * @var bool
      */
 
-    private $_restock = false;
+    public $restock = false;
 
     /**
      * @var Refund
@@ -70,32 +77,9 @@ class RefundLineItem extends LineItem
     {
         $attributes = parent::attributes();
 
-        $attributes[] = 'restock';
         $attributes[] = 'refund';
 
         return $attributes;
-    }
-
-    /**
-     * Setter for the `restock` property
-     * 
-     * @param bool $restock
-     */
-
-    public function setRestock( bool $restock = null )
-    {
-        $this->_restock = !!($restock);
-    }
-
-    /**
-     * Getter for the `restock` property
-     * 
-     * @return bool
-     */
-
-    public function getRestock(): bool
-    {
-        return $this->qty ? $this->_restock : false;
     }
 
     /**
@@ -121,29 +105,6 @@ class RefundLineItem extends LineItem
     public function getRefund(): Refund
     {
         return $this->_refund;
-    }
-
-    /**
-     * The attributes on the order that should be made available as formatted currency.
-     *
-     * @return array
-     */
-
-    public function currencyAttributes(): array
-    {
-        $attributes = [];
-        $attributes[] = 'price';
-        $attributes[] = 'saleAmount';
-        $attributes[] = 'salePrice';
-        $attributes[] = 'subtotal';
-        $attributes[] = 'total';
-        $attributes[] = 'discount';
-        $attributes[] = 'shippingCost';
-        $attributes[] = 'tax';
-        $attributes[] = 'taxIncluded';
-        $attributes[] = 'adjustmentsTotal';
-
-        return $attributes;
     }
 
     // =Validation
@@ -175,9 +136,83 @@ class RefundLineItem extends LineItem
     {
         $fields = parent::fields();
 
-        unset($fields['refund']);
+        // remove the 'refund' field
+        $fields = ArrayHelper::without($fields, 'refund');
+        $fields = ArrayHelper::withoutValue($fields, 'refund');
+
+        $fields[] = 'canRestock';
+        $fields[] = 'restockedQty';
+        $fields[] = 'restockableQty';
+        $fields[] = 'qtyToRestock';
 
         return $fields;
+    }
+
+    /**
+     * @inheritdoc
+     */
+
+    public function extraFields(): array
+    {
+        $fields = parent::extraFields();
+
+        // add the 'refund' extra field
+        $fields[] = 'refund';
+
+        return $fields;
+    }
+
+    /**
+     * Returns whether line item can be restocked
+     * 
+     * @return bool
+     */
+
+    public function getCanRestock(): bool
+    {
+        return RefundHelper::isRestockableLineItem($this);
+    }
+
+    /**
+     * Get line item qty that has been restocked
+     * 
+     * @return int
+     */
+
+    public function getRestockedQty(): int
+    {
+        $refund = $this->getRefund();
+
+        if (isset($refund->restockedQuantities[$this->id])) {
+            return $refund->restockedQuantities[$this->id];
+        }
+
+        return 0;
+    }
+
+    /**
+     * Returns line item quantity that can be restocked
+     * 
+     * @return int
+     */
+
+    public function getRestockableQty(): int
+    {
+        if (!$this->getCanRestock()) return 0;
+        return ($this->qty - $this->getRestockedQty());
+    }
+
+    /**
+     * 
+     */
+
+    public function getQtyToRestock(): int
+    {
+        if ($this->restock == false) {
+            return 0;
+        }
+
+        return $this->getRestockableQty();
     }
 
     /**

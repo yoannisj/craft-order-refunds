@@ -14,14 +14,15 @@ namespace yoannisj\orderrefunds\events;
 use yii\base\Event;
 
 use yoannisj\orderrefunds\models\Refund;
+use yoannisj\orderrefunds\models\RefundLineItem;
 
 /**
- * Class for Refund event objects
+ * Class for Refund Line Item event objects
  * 
  * @since 0.1.0
  */
 
-class RefundEvent extends Event
+class RefundLineItemEvent extends Event
 {
     /**
      * @var Refund Refund for which the action is being performed
@@ -34,4 +35,10 @@ class RefundEvent extends Event
      */
 
     public $isNew;
+
+    /**
+     * @var RefundLineItem Line item for which action is being performed
+     */
+
+    public $lineItem;
 }

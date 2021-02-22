@@ -34,14 +34,26 @@ use yoannisj\orderrefunds\helpers\AdjustmentHelper;
  * 
  * @since 0.1.0
  * 
+ * @prop read-only hasRestockedLineItems
+ * @prop read-only hasLineItemsToRestock
+ * @prop read-only totalQty
+ * @prop read-only itemSubtotal
  * @prop read-only itemSubtotalAsCurrency
+ * @prop read-only totalAdjustments
  * @prop read-only totalAdjustmentsAsCurrency
+ * @prop read-only totalShippingCost
  * @prop read-only totalShippingCostAsCurrency
+ * @prop read-only totalTax
  * @prop read-only totalTaxAsCurrency
+ * @prop read-only totalTaxIncluded
  * @prop read-only totalTaxIncludedAsCurrency
  * @prop read-only totalTaxExcluded
+ * @prop read-only totalTaxExcludedAsCurrency
+ * @prop read-only total
  * @prop read-only totalAsCurrency
+ * @prop read-only totalPrice
  * @prop read-only totalPriceAsCurrency
+ * @prop read-only transactionAmount
  * @prop read-only transactionAmountAsCurrency
  * 
  * @todo Support arbitrary compensations in refunds
@@ -51,6 +63,10 @@ class Refund extends Model
 {
     // =Static
     // =========================================================================
+
+    const SCENARIO_CALCULATE = 'calculate';
+    const SCENARIO_CREATE = 'create';
+    const SCENARIO_UPDATE = 'update';
 
     // =Properties
     // =========================================================================
@@ -68,16 +84,22 @@ class Refund extends Model
     public $reference;
 
     /**
-     * @var integer ID of refunding transaction
+     * @var int ID of refunded order
      */
 
-    public $transactionId;
+    private $_orderId;
 
     /**
-     * @var Transaction Reference to refunded transaction
+     * @var Order Reference to refunded order
      */
 
-    private $_transaction;
+    private $_order;
+
+    /**
+     * @var string
+     */
+
+    private $_note;
 
     /**
      * @var integer ID of parent transaction (transaction that was refunded)
@@ -92,16 +114,16 @@ class Refund extends Model
     private $_parentTransaction;
 
     /**
-     * @var int ID of refunded order
+     * @var integer ID of refunding transaction
      */
 
-    private $_orderId;
+    public $transactionId;
 
     /**
-     * @var Order Reference to refunded order
+     * @var Transaction Reference to refunded transaction
      */
 
-    private $_order;
+    private $_transaction;
 
     /**
      * @var array Data for line items covered by the refund
@@ -110,10 +132,10 @@ class Refund extends Model
     private $_lineItemsData = [];
 
     /**
-     * @var bool Whether the refund covers the order's shipping cost
+     * @var array Quantities that have been restocked so far
      */
 
-    private $_includesShipping = false;
+    public $restockedQuantities = [];
 
     /**
      * @var RefundLineItem[] Computed list of scoped refund line items
@@ -122,10 +144,22 @@ class Refund extends Model
     private $_lineItems;
 
     /**
+     * @var bool Whether the refund covers the order's shipping cost
+     */
+
+    private $_includesShipping = false;
+
+    /**
      * @var OrderAdjustment[] Computed list of scoped refund adjustments
      */
 
     private $_adjustments;
+
+    /**
+     * @var bool Whether this refund's details can be revised or are immutable
+     */
+
+    public $isRevisable = false;
 
     /**
      * @var string|Datetime Date at which the refund was created
@@ -168,6 +202,28 @@ class Refund extends Model
         return $behaviors;
     }
 
+    /**
+     * @inheritdoc
+     */
+
+    public function scenarios()
+    {
+        $scenarios = parent::scenarios();
+        $validAttributes = array_merge(
+            $this->attributes(),
+            // add computed properties that are subject to validation
+            [ 'orderId', 'parentTransactionId', 'total' ]
+        );
+
+        // @todo: remove unsafe attributes for each scenario
+        $scenarios[self::SCENARIO_DEFAULT] = $validAttributes;
+        $scenarios[self::SCENARIO_CALCULATE] = $validAttributes;
+        $scenarios[self::SCENARIO_CREATE] = $validAttributes;
+        $scenarios[self::SCENARIO_UPDATE] = $validAttributes;
+
+        return $scenarios;
+    }
+
     // =Attributes
     // -------------------------------------------------------------------------
 
@@ -191,9 +247,13 @@ class Refund extends Model
      * @param array $value
      */
 
-    public function setLineItemsData( array $value )
+    public function setLineItemsData( $data )
     {
-        $this->_lineItemsData = $value;
+        if (is_string($data)) {
+            $data = JsonHelper::decode($data);
+        }
+
+        $this->_lineItemsData = $data;
 
         // force re-calculation of computed properties that are affected
         $this->_lineItems = null;
@@ -247,100 +307,207 @@ class Refund extends Model
     {
         $rules = parent::rules();
 
-        $rules['attrRequired'] = [ ['transactionId', 'reference'], 'required',
-            'when' => function($model) {
-                return !empty($model->id);
-            }
+        // required attributes
+        $rules['attrRequiredCreate'] = [
+            ['parentTransactionId', 'total'],
+            'required', 'on' => self::SCENARIO_CREATE,
         ];
 
-        $rules['attrBoolean'] = [ ['includesShipping'], 'boolean' ];
-        $rules['attrArray'] = [ ['lineItemsData'], ArrayValidator::class ];
-        $rules['attrId'] = [ ['transactionId'], 'integer', 'min' => 1 ];
-
-        $rules['transactionIdCorrespond'] = [
-            'transactionId',
-            function(string $attribute, $params, InlineValidator $validator, $value)
-            {
-                $transaction = $this->getTransaction();
-                $orderId = $this->_orderId;
-                $parentTransactionId = $this->_parentTransactionId;
-
-                if ($transaction && $orderId && $transaction->orderId != $orderId)
-                {
-                    $validator->addError($this, $attribute,
-                        '{attribute} value `{value}` does not correspond with order');
-                }
-
-                if ($transaction && $parentTransactionId && $transaction->$parentTransactionId != $parentTransactionId)
-                {
-                    $validator->addError($this, $attribute,
-                        '{attribute} value `{value}` does not correspond with parent transaction');
-                }
-            }
+        $rules['attrRequiredUpdate'] = [
+            ['id', 'transactionId', 'reference'],
+            'required', 'on' => self::SCENARIO_UPDATE,
         ];
 
-        $rules['orderIdCorrespond'] = [
+        // attribute formatting
+        $rules['attrBoolean'] = [
+            ['includesShipping', 'isRevisable'],
+            'boolean'
+        ];
+
+        $rules['attrId'] = [
+            ['id', 'orderId', 'parentTransactionId', 'transactionId'],
+            'integer', 'min' => 1,
+        ];
+
+        $rules['attrArray'] = [
+            ['lineItemsData', 'restockedQuantities'],
+            ArrayValidator::class,
+        ];
+
+        // attribute relations
+        $rules['orderCorresponds'] = [
             'orderId',
-            function(string $attribute, $params, InlineValidator $validator, $value)
-            {
-                $transaction = $this->getTransaction();
-                $parentTransaction = $this->getParentTransaction();
-
-                if ($transaction && $transaction->orderId != $value)
-                {
-                    $validator->addError($this, $attribute,
-                        '{attribute} value `{value}` does not correspond with transaction');
-                }
-
-                if ($parentTransaction && $parentTransaction->orderId != $value)
-                {
-                    $validator->addError($this, $attribute, Craft::t('order-refunds',
-                        '{attribute} value `{value}` does not correspond with parent transaction'));
-                }
-            }
+            'validateOrderCorresponds'
         ];
 
-        $rules['parentTransactionIdCorrespond'] = [
+        $rules['parentTransactionCorresponds'] = [
             'parentTransactionId',
-            function(string $attribute, $params, InlineValidator $validator, $value)
-            {
-                $parentTransaction = $this->getParentTransaction();
-                $orderId = $this->_orderId;
-                $transaction = $this->getTransaction();
+            'validateParentTransactionCorresponds'
+        ];
 
-                if ($transaction && $transaction->parentId != $value)
-                {
-                    $validator->addError($this, $attribute, Craft::t('order-refunds',
-                        '{attribute} value `{value}` does not correspond with transaction.'));
-                }
+        $rules['transactionCorresponds'] = [
+            'transactionId',
+            'validateTransactionCorresponds'
+        ];
 
-                if ($orderId && $parentTransaction && $orderId != $parentTransaction->orderId)
-                {
-                    $validator->addError($this, $attribute, Craft::t('order-refunds',
-                        '{attribute} value `{value}` does not correspond with order.'));
-                }
-            }
+        // transaction amounts
+        $rules['totalRefundable'] = [
+            'parentTransactionId',
+            'validateParentTransactionRefundable',
+            'on' => [ self::SCENARIO_CREATE ],
         ];
 
         $rules['totalMatchesTransaction'] = [
             'total',
-            function(string $attribute, $params, InlineValidator $validator, $value)
-            {
-                if ($this->transactionId
-                    && $this->getTransactionAmount() != $value
-                ) {
-                    $validator->addError($this, $attribute, Craft::t('order-refunds',
-                        '{attribute} must match the refund transaction amount of {amount}.',
-                        [ 'amount' => $this->transactionAmountAsCurrency ],
-                    ));
-                }
-            },
-            'when' => function($model) {
-                return !empty($model->transactionId);
-            }
+            'validateTotalMatchesTransaction',
         ];
 
         return $rules;
+    }
+
+    /**
+     * Validation method checking if refund transaction corresponds to 
+     * the refunded order and parentTransaction
+     * 
+     * @param string $attribute
+     * @param array|null $params
+     * @param InlineValidator $validator
+     * @param mixed $value
+     */
+
+    public function validateTransactionCorresponds( string $attribute, $params, InlineValidator $validator, $value )
+    {
+        $transaction = $this->getTransaction();
+        $orderId = $this->_orderId;
+        $parentTransactionId = $this->_parentTransactionId;
+
+        if ($transaction && $orderId && $transaction->orderId != $orderId)
+        {
+            $validator->addError($this, $attribute,
+                'Refund transaction must belong to refund order');
+        }
+
+        if ($transaction && $parentTransactionId
+            && $transaction->parentId != $parentTransactionId)
+        {
+            $validator->addError($this, $attribute,
+                'Refund transaction must be a child of refund parent transaction');
+        }
+    }
+
+    /**
+     * Validation method checking if refunded order corresponds to the refund
+     * transaction and/or the refunded parent transaction
+     * 
+     * @param string $attribute
+     * @param array|null $params
+     * @param InlineValidator $validator
+     * @param mixed $value
+     */
+
+    public function validateOrderCorresponds( string $attribute, $params, InlineValidator $validator, $value )
+    {
+        $transaction = $this->getTransaction();
+        $parentTransaction = $this->getParentTransaction();
+
+        if ($transaction && $transaction->orderId != $value)
+        {
+            $validator->addError($this, $attribute,
+                '{attribute} value `{value}` does not correspond with transaction');
+        }
+
+        if ($parentTransaction && $parentTransaction->orderId != $value)
+        {
+            $validator->addError($this, $attribute, Craft::t('order-refunds',
+                '{attribute} value `{value}` does not correspond with parent transaction'));
+        }
+    }
+
+    /**
+     * Validation method checking if the refunded parent transaction corresponds
+     * to the refund transaction and/or the refunded order
+     * 
+     * @param string $attribute
+     * @param array|null $params
+     * @param InlineValidator $validator
+     * @param mixed $value
+     */
+
+    public function validateParentTransactionCorresponds( string $attribute, $params, InlineValidator $validator, $value )
+    {
+        $parentTransaction = $this->getParentTransaction();
+        $orderId = $this->_orderId;
+        $transaction = $this->getTransaction();
+
+        if ($transaction && $transaction->parentId != $value)
+        {
+            $validator->addError($this, $attribute, Craft::t('order-refunds',
+                '{attribute} value `{value}` does not correspond with transaction.'));
+        }
+
+        if ($orderId && $parentTransaction && $orderId != $parentTransaction->orderId)
+        {
+            $validator->addError($this, $attribute, Craft::t('order-refunds',
+                '{attribute} value `{value}` does not correspond with order.'));
+        }
+    }
+
+    /**
+     * Validation method checking if the parent transaction is refundable
+     * and/or if the refund's total does not exceed its refundable amount
+     * 
+     * @param string $attribute
+     * @param array|null $params
+     * @param InlineValidator $validator
+     * @param mixed $value
+     */
+
+    public function validateParentTransactionRefundable( string $attribute, $params, InlineValidator $validator, $value )
+    {
+        $parentTransaction = $this->getParentTransaction();
+        if (!$parentTransaction) return;
+
+        if (!$parentTransaction->canRefund())
+        {
+            $validator->addError($this, $attribute, Craft::t('order-refunds',
+                "Parent transaction with ID `{value}` is not refundable."));
+        }
+
+        else
+        {
+            $total = $this->getTotal();
+            $refundableAmount = $parentTransaction->getRefundableAmount();
+
+            if ($total > $refundableAmount)
+            {
+                $validator->addError($this, $attribute, Craft::t('order-refunds',
+                    "Refund total {total} exceeds parent transaction's refundable amount of {amount}",
+                    [ 'total' => $total, 'amount' => $refundableAmount ],
+                ));
+            }
+        }
+    }
+
+    /**
+     * Validation method checking if the refund total matches the refund
+     * transaction's amount
+     * 
+     * @param string $attribute
+     * @param array|null $params
+     * @param InlineValidator $validator
+     * @param mixed $value
+     */
+
+    public function validateTotalMatchesTransaction( string $attribute, $params, InlineValidator $validator, $value )
+    {
+        if ($this->transactionId
+            && $this->getTransactionAmount() != $value
+        ) {
+            $validator->addError($this, $attribute, Craft::t('order-refunds',
+                '{attribute} must match the refund transaction amount of {amount}.',
+                [ 'amount' => $this->transactionAmountAsCurrency ],
+            ));
+        }
     }
 
     // =Fields
@@ -375,12 +542,13 @@ class Refund extends Model
 
         $fields[] = 'orderId';
         $fields[] = 'parentTransactionId';
+        $fields[] = 'note';
         $fields[] = 'transactionDate';
-        $fields[] = 'transactionNote';
         $fields[] = 'transactionAmount';
         $fields[] = 'transactionCurrency';
 
         $fields[] = 'lineItems';
+        $fields[] = 'hasRestockedLineItems';
         $fields[] = 'totalQty';
         $fields[] = 'itemSubtotal';
 
@@ -447,6 +615,8 @@ class Refund extends Model
 
     public function getOrderId()
     {
+        // @todo: get order id without querying for transaction?
+        // (unless transaction was already queried)
         if (!isset($this->_orderId)
             && ($transaction = $this->getTransaction())
         ) {
@@ -557,6 +727,30 @@ class Refund extends Model
     }
 
     /**
+     * Setter for computed `transaction` property
+     * 
+     * @param Transaction|null $transaction
+     */
+
+    public function setTransaction( Transaction $transaction = null )
+    {
+        $this->transactionId = $transaction->id;
+        $this->_transaction = $transaction;
+
+        // force re-calculate computed `order`
+        if (!isset($this->_orderId) && isset($this->_order)) {
+             $this->_order = null;
+        }
+
+        // force re-calculate computed `parentTransaction`
+        if (!isset($this->_parentTransactionId)
+            && isset($this->_parentTransaction)
+        ) {
+            $this->_parentTransaction = null;
+        }
+    }
+
+    /**
      * @return Transaction \ null
      */
 
@@ -569,6 +763,32 @@ class Refund extends Model
         }
 
         return $this->_transaction;
+    }
+
+    /**
+     * Setter method for computed 'note' property
+     * 
+     * @param string|null $note
+     */
+
+    public function setNote( string $note = null )
+    {
+        $this->_note = $note;
+    }
+
+    /**
+     * Getter method for computed 'note' property
+     * 
+     * @return string|null
+     */
+
+    public function getNote()
+    {
+        if (($transaction = $this->getTransaction())) {
+            return $transaction->note;
+        }
+
+        return $this->_note;
     }
 
     /**
@@ -612,16 +832,6 @@ class Refund extends Model
     }
 
     /**
-     * @return string | null
-     */
-
-    public function getTransactionNote()
-    {
-        $transaction = $this->getTransaction();
-        return $transaction ? $transaction->note : null;
-    }
-
-    /**
      * Returns order line items covered by the refund
      * 
      * @return RefundLineItem[]
@@ -634,6 +844,36 @@ class Refund extends Model
         }
 
         return $this->_lineItems;
+    }
+
+    /**
+     * Returns whether any of the refunded line items has been restocked
+     * 
+     * @return bool
+     */
+
+    public function getHasRestockedLineItems(): bool
+    {
+        foreach ($this->getLineItems() as $lineItem) {
+            if ($lineItem->getRestockedQty() > 0) return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns whether any of the refunded line items can be restocked
+     * 
+     * @return bool
+     */
+
+    public function getHasLineItemsToRestock(): bool
+    {
+        foreach ($this->getLineItems() as $lineItem) {
+            if ($lineItem->getQtyToRestock() > 0) return true;
+        }
+
+        return false;
     }
 
     /**
@@ -856,7 +1096,7 @@ class Refund extends Model
 
             // create refund line item by transferring attributes
             $refundLineItem = new RefundLineItem();
-            $refundLineItem->setAttributes($attributes);
+            $refundLineItem->setAttributes($attributes, false);
 
             // update attributes to reflect refund's lineItemData
             $refundLineItem->qty = $refundQty;

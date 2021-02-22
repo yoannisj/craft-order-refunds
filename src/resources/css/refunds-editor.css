@@ -119,7 +119,7 @@
 
 .refund-form-lineitems .editable td.refund-item-qty input {
   display: inline-block;
-  padding: 7px 0 7px 7px;
+  padding: 4px 0 4px 7px;
   width: 35px;
   text-align: right;
 }
@@ -250,33 +250,15 @@
   }
 }
 
-@media (min-width: 974px)
+@media (min-width: 1280px)
 {
-  .refund-header {
-    flex: 0 0 33.33333%;
-  }
-
-  .refund-main {
-    flex: 0 0 66.66667%;
-  }
-
-  .refund-main--new {
-    margin-left: 33.33333%;
-  }
-}
-
-@media (min-width: 1440px)
-{
-  .refund-header {
-    flex: 0 0 25%;
-  }
-
-  .refund-main {
-    flex: 0 0 75%;
-  }
-
-  .refund-main--new {
-    margin-left: 25%;
+  .refund-summary-lineitems,
+  .refund-summary-note,
+  .refund-summary-shipping,
+  .refund-summary-amount,
+  .refund-summary-shipping,
+  .refund-summary-amount {
+    width: 50%;
   }
 }
 

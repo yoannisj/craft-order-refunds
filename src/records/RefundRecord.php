@@ -63,6 +63,7 @@ class RefundRecord extends ActiveRecord
 
     // =Magic
     // -------------------------------------------------------------------------
+
     /**
      * @inheritdoc
      */
@@ -71,9 +72,10 @@ class RefundRecord extends ActiveRecord
     {
         $value = parent::__get($name);
 
-        if ($name == 'lineItemsData' && !is_array($value))
-        {
-            $value = $value = JsonHelper::decodeIfJson($value) ?? [];
+        if (($name == 'lineItemsData' || $name == 'restockedQuantities')
+            && !is_array($value)
+        ) {
+            $value = JsonHelper::decodeIfJson($value) ?? [];
             $this->setAttribute($name, $value);
         }
 
@@ -81,6 +83,9 @@ class RefundRecord extends ActiveRecord
     }
 
     // =Attributes
+    // -------------------------------------------------------------------------
+
+    // =Operations
     // -------------------------------------------------------------------------
 
     // =Protected Methods
