@@ -45,6 +45,8 @@ use yoannisj\orderrefunds\helpers\AdjustmentHelper;
  * @prop read-only totalShippingCostAsCurrency
  * @prop read-only totalTax
  * @prop read-only totalTaxAsCurrency
+ * @prop read-only totalAddedTax
+ * @prop read-only totalAddedTaxAsCurrency
  * @prop read-only totalTaxIncluded
  * @prop read-only totalTaxIncludedAsCurrency
  * @prop read-only totalTaxExcluded
@@ -524,6 +526,7 @@ class Refund extends Model
             'adjustmentsTotal',
             'totalShippingCost',
             'totalTax',
+            'totalAddedTax',
             'totalTaxIncluded',
             'totalTaxExcluded',
             'total',
@@ -556,6 +559,7 @@ class Refund extends Model
         $fields[] = 'orderAdjustments';
         $fields[] = 'totalShippingCost';
         $fields[] = 'totalTax';
+        $fields[] = 'totalAddedTax';
         $fields[] = 'totalTaxIncluded';
         $fields[] = 'totalTaxExcluded';
         $fields[] = 'adjustmentsTotal';
@@ -998,6 +1002,34 @@ class Refund extends Model
         {
             if ($adjustment->type == 'tax') {
                 $total += $adjustment->amount;
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * Returns added tax amount covered by the refund
+     * 
+     * @return float
+     */
+
+    public function getTotalAddedTax(): float
+    {
+        $total = 0;
+
+        foreach ($this->getAdjustments() as $adjustment)
+        {
+            if ($adjustment->type == 'tax') {
+                $total += $adjustment->amount;
+            }
+
+            else if ($adjustment->type == 'discount')
+            {
+                $snapshot = $adjustment->getSourceSnapshot();
+                if (array_key_exists('taxable', $snapshot)) {
+                    $total += $adjustment->amount;
+                }
             }
         }
 

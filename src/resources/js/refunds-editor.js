@@ -52,6 +52,7 @@
         this.$lineItemRows = this.$form.find('.refund-form-lineitems tbody tr');
         this.$itemSubtotal = this.$form.find('.refund-form-itemsubtotal');
         this.$shippingCost = this.$form.find('.refund-form-shippingcost');
+        this.$addedTax = this.$form.find('.refund-form-addedtax');
         this.$taxIncluded = this.$form.find('.refund-form-taxincluded');
         this.$taxExcluded = this.$form.find('.refund-form-taxexcluded');
         this.$total = this.$form.find('.refund-form-total');
@@ -275,6 +276,7 @@
 
             this.$itemSubtotal.html(refund.itemSubtotalAsCurrency);
             this.$shippingCost.html(refund.totalShippingCostAsCurrency);
+            this.$addedTax.html(refund.totalAddedTaxAsCurrency);
             this.$taxIncluded.html(refund.totalTaxIncludedAsCurrency);
             this.$taxExcluded.html(refund.totalTaxExcludedAsCurrency);
             this.$total.html(refund.totalAsCurrency);

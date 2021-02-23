@@ -109,15 +109,18 @@
             data-attribute="totalShippingCost"
             data-label="{{ 'Shippping Cost' | t('commerce') }}"
         >{{ refund.totalShippingCostAsCurrency }}</strong>
-        <div class="amount-group">
+        <strong class="refund-form-addedtax amount" data-attribute="totalTaxExcluded"
+            data-label="{{ 'Added Tax' | t('order-refunds') }}"
+        >{{ refund.totalAddedTaxAsCurrency }}</strong>
+        {# <div class="amount-group">
             <span class="refund-form-taxincluded amount"
-                data-attribute="totalTaxIncluded"
+                data-attribute="totalTax"
                 data-label="{{ 'Tax (Incl.)' | t('order-refunds') }}"
             >{{ refund.totalTaxIncludedAsCurrency }}</span>
-            <strong class="refund-form-taxexcluded amount" data-attribute="totalTaxExcluded"
-                data-label="{{ 'Tax (Excl.)' | t('order-refunds') }}"
+            <strong class="refund-form-tax amount" data-attribute="totalTaxExcluded"
+                data-label="{{ 'Total (Excl.)' | t('order-refunds') }}"
             >{{ refund.totalTaxExcludedAsCurrency }}</strong>
-        </div>
+        </div> #}
         <div class="amount-group">
             {% if refund.transactionId -%}
                 <span class="refund-form-transactionamount amount"
