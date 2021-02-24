@@ -45,8 +45,8 @@ use yoannisj\orderrefunds\helpers\AdjustmentHelper;
  * @prop read-only totalShippingCostAsCurrency
  * @prop read-only totalTax
  * @prop read-only totalTaxAsCurrency
- * @prop read-only totalAddedTax
- * @prop read-only totalAddedTaxAsCurrency
+ * @prop read-only totalTaxAdjustment
+ * @prop read-only totalTaxAdjustmentAsCurrency
  * @prop read-only totalTaxIncluded
  * @prop read-only totalTaxIncludedAsCurrency
  * @prop read-only totalTaxExcluded
@@ -526,7 +526,7 @@ class Refund extends Model
             'adjustmentsTotal',
             'totalShippingCost',
             'totalTax',
-            'totalAddedTax',
+            'totalTaxAdjustment',
             'totalTaxIncluded',
             'totalTaxExcluded',
             'total',
@@ -559,7 +559,7 @@ class Refund extends Model
         $fields[] = 'orderAdjustments';
         $fields[] = 'totalShippingCost';
         $fields[] = 'totalTax';
-        $fields[] = 'totalAddedTax';
+        $fields[] = 'totalTaxAdjustment';
         $fields[] = 'totalTaxIncluded';
         $fields[] = 'totalTaxExcluded';
         $fields[] = 'adjustmentsTotal';
@@ -1009,12 +1009,12 @@ class Refund extends Model
     }
 
     /**
-     * Returns added tax amount covered by the refund
+     * Returns total tax adjustment amount for the refund
      * 
      * @return float
      */
 
-    public function getTotalAddedTax(): float
+    public function getTotalTaxAdjustment(): float
     {
         $total = 0;
 
