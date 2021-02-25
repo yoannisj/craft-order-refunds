@@ -126,9 +126,6 @@ class Install extends Migration
         // fetch all existing refund transactions (ordered by dateCreated) 
         $transactions = $this->fetchAllRefundTransactions();
 
-        // fetch all existing refund records
-        $refunds = RefundRecord::find()->all();
-
         // create missing Refund records for each refund transaction
         $view = Craft::$app->getView();
         $refTemplate = OrderRefunds::$plugin->getSettings()->refundReferenceTemplate;
@@ -137,7 +134,7 @@ class Install extends Migration
         {
             // get Refund model and record for order's refund transaction
             $config = [ 'transactionId' => (int)$transaction->id ];
-            $record = ArrayHelper::firstWhere($refunds, $config);
+            $record = RefundRecord::findOne($config);
             $model = new Refund($config);
 
             // transfer record attributes to model or vice-versa
