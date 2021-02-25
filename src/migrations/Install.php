@@ -14,10 +14,13 @@ namespace yoannisj\orderrefunds\migrations;
 
 use Craft;
 use craft\db\Table;
+use craft\db\Query;
 use craft\db\Migration;
 use craft\helpers\ArrayHelper;
 
 use craft\commerce\db\Table as CommerceTable;
+use craft\commerce\models\Transaction;
+use craft\commerce\records\Transaction as TransactionRecord;
 use craft\commerce\elements\Order;
 use craft\commerce\elements\db\OrderQuery;
 
@@ -116,18 +119,15 @@ class Install extends Migration
 
     protected function createRefundRecords()
     {
-        $orders = (new OrderQuery(Order::class))
-            ->with('transactions')
-            ->limit(null)
-            ->all();
+        // CLI feedback
+        echo "    > creating missing refund records ...";
+        $time = microtime(true);
 
-        $transactions = [];
-        foreach ($orders as $order) {
-            $transactions += RefundHelper::getRefundTransactions($order);
-        }
+        // fetch all existing refund transactions (ordered by dateCreated) 
+        $transactions = $this->fetchAllRefundTransactions();
 
-        // sort refund transactions in ascending order to create references
-        ArrayHelper::multisort($transactions, 'dateCreated', SORT_ASC);
+        // fetch all existing refund records
+        $refunds = RefundRecord::find()->all();
 
         // create missing Refund records for each refund transaction
         $view = Craft::$app->getView();
@@ -137,12 +137,12 @@ class Install extends Migration
         {
             // get Refund model and record for order's refund transaction
             $config = [ 'transactionId' => (int)$transaction->id ];
-            $record = RefundRecord::findOne($config);
+            $record = ArrayHelper::firstWhere($refunds, $config);
             $model = new Refund($config);
 
             // transfer record attributes to model or vice-versa
             if ($record) {
-                $model->setAttributes($record->getAttributes());
+                $model->setAttributes($record->getAttributes(), false);
             } else {
                 // refunds created upon install are revisable
                 $model->isRevisable = true;
@@ -159,5 +159,59 @@ class Install extends Migration
             // save record
             $record->save();
         }
+
+        echo " done (time: " . sprintf('%.3f', microtime(true) - $time) . "s)\n";
+    }
+
+    /**
+     * Fetches all existing Commerce refund transactions from the database
+     * and orders them by date created
+     * 
+     * @return \craft\commerce\models\Transaction[]
+     */
+
+    protected function fetchAllRefundTransactions(): array
+    {
+        $query = (new Query())
+            ->select([
+                'id',
+                'orderId',
+                'hash',
+                'gatewayId',
+                'type',
+                'status',
+                'amount',
+                'currency',
+                'paymentAmount',
+                'paymentCurrency',
+                'paymentRate',
+                'reference',
+                'message',
+                'note',
+                'code',
+                'response',
+                'userId',
+                'parentId',
+                'dateCreated',
+                'dateUpdated',
+            ])
+            ->from([ CommerceTable::TRANSACTIONS ])
+            ->where([
+                'type' => TransactionRecord::TYPE_REFUND,
+                'status' => TransactionRecord::STATUS_SUCCESS,
+            ])
+            ->orderBy([ 'dateCreated' => SORT_ASC ]);
+
+        $transactions = [];
+
+        foreach ($query->all() as $row)
+        {
+            $transaction = new Transaction($row);
+            $transactions[] = $transaction;
+        }
+
+        echo (" ". count($transactions) . " refund transactions found ...");
+
+        return $transactions;
     }
 }
