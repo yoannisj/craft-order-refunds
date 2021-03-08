@@ -20,6 +20,7 @@ use craft\helpers\ArrayHelper;
 use craft\commerce\models\LineItem;
 use craft\commerce\models\OrderAdjustment;
 use craft\commerce\records\TaxRate as TaxRateRecord;
+use craft\commerce\helpers\Currency as CurrencyHelper;
 
 /**
  * Class with static helper methods to work with Order Adjustments
@@ -51,11 +52,11 @@ class AdjustmentHelper
         $lineItem = $adjustment->getLineItem();
         if (!$lineItem) return null;
 
-        $adjustment->amount = $adjustment->amount / $lineItem->qty * $quantity;
+        $amount = $adjustment->amount / $lineItem->qty * $quantity;
+        $adjustment->amount = CurrencyHelper::round($amount);
 
         return $adjustment;
     }
-
 
     /**
      * Returns the amount that is part of line item's taxable price,

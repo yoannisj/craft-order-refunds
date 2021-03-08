@@ -23,6 +23,7 @@ use craft\commerce\models\Transaction;
 use craft\commerce\records\TaxRate as TaxRateRecord;
 use craft\commerce\elements\Order;
 use craft\commerce\behaviors\CurrencyAttributeBehavior;
+use craft\commerce\helpers\Currency as CurrencyHelper;
 
 use yoannisj\orderrefunds\OrderRefunds;
 use yoannisj\orderrefunds\models\RefundLineItem;
@@ -1253,9 +1254,11 @@ class Refund extends Model
 
             if ($isIncluded) {
                 $taxExcludedPrice = ($taxableAmount / (1 + $taxRate));
-                $refundAdjustment->amount = ($taxableAmount - $taxExcludedPrice);
+                $taxAmount = ($taxableAmount - $taxExcludedPrice);
+                $refundAdjustment->amount = CurrencyHelper::round($taxAmount);
             } else {
-                $refundAdjustment->amount = $taxableAmount * $taxRate;
+                $taxAmount = $taxableAmount * $taxRate;
+                $refundAdjustment->amount = CurrencyHelper::round($taxAmount);
             }
 
             // re-include re-calculated line item tax adjustment
@@ -1287,9 +1290,11 @@ class Refund extends Model
 
             if ($isIncluded) {
                 $taxExcludedPrice = ($taxableAmount / (1 + $taxRate));
-                $refundAdjustment->amount = ($taxableAmount - $taxExcludedPrice);
+                $taxAmount = $taxableAmount - $taxExcludedPrice;
+                $refundAdjustment->amount = CurrencyHelper::round($taxAmount);
             } else {
-                $refundAdjustment->amount = $taxableAmount * $taxRate;
+                $taxAmount = $taxableAmount * $taxRate;
+                $refundAdjustment->amount = CurrencyHelper::round($taxAmount);
             }
 
             $refundAdjustments[] = $refundAdjustment;
