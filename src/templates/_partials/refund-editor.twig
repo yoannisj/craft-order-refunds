@@ -65,7 +65,7 @@
                 <!-- =amount -->
                 <li class="refund-summary-amount">
                     <strong>{{ 'Refund Amount' | t('commerce') }}</strong>
-                    <br><span>{{ refund.transaction.amount | currency(refund.transactionCurrency) }}</span>
+                    <br><span>{{ refund.transaction.amount | currency(refund.transaction.currency) }}</span>
                 </li>
             </ul>
         </div>

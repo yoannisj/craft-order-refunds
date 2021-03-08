@@ -20,6 +20,7 @@ use craft\validators\ArrayValidator;
 
 use craft\commerce\Plugin as Commerce;
 use craft\commerce\models\Transaction;
+use craft\commerce\models\Currency;
 use craft\commerce\records\TaxRate as TaxRateRecord;
 use craft\commerce\elements\Order;
 use craft\commerce\behaviors\CurrencyAttributeBehavior;
@@ -35,6 +36,8 @@ use yoannisj\orderrefunds\helpers\AdjustmentHelper;
  * 
  * @since 0.1.0
  * 
+ * @prop read-only currency
+ * @prop read-only lineItems
  * @prop read-only hasRestockedLineItems
  * @prop read-only hasLineItemsToRestock
  * @prop read-only totalQty
@@ -193,7 +196,7 @@ class Refund extends Model
     {
         $behaviors = parent::behaviors();
 
-        $defaultCurrency = ($this->getTransactionCurrency() ?? Commerce::getInstance()
+        $defaultCurrency = ($this->getCurrency() ?? Commerce::getInstance()
             ->getPaymentCurrencies()->getPrimaryPaymentCurrencyIso());
 
         $behaviors['currencyAttributes'] = [
@@ -549,8 +552,8 @@ class Refund extends Model
         $fields[] = 'note';
         $fields[] = 'transactionDate';
         $fields[] = 'transactionAmount';
-        $fields[] = 'transactionCurrency';
 
+        $fields[] = 'currency';
         $fields[] = 'lineItems';
         $fields[] = 'hasRestockedLineItems';
         $fields[] = 'totalQty';
@@ -818,22 +821,32 @@ class Refund extends Model
     }
 
     /**
-     * @return string | null
+     * @return Currency | null
      */
 
-    public function getTransactionCurrency()
+    public function getCurrency()
     {
-        $transaction = $this->getTransaction();
-        if ($transaction) {
-            return $transaction->currency;
+        $currency = null;
+        
+        if (($transaction = $this->getTransaction())) {
+            $currency = $transaction->currency;
         }
 
-        $order = $this->getOrder();
-        if ($order) {
-            return $order->paymentCurrency;
+        else if (($parentTransaction = $this->getParentTransaction())) {
+            $currency = $parentTransaction->currency;
         }
 
-        return null;
+        else if (($order = $this->getOrder())) {
+            $currency = $order->paymentCurrency ?: $order->currency;
+        }
+
+        if (is_string($currency))
+        {
+            $currency = Commerce::getInstance()->getPaymentCurrencies()
+                -> getPaymentCurrencyByIso($currency);
+        }
+
+        return $currency;
     }
 
     /**

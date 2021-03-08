@@ -83,10 +83,8 @@ class OrderRefundsVariable extends Refunds
 
     public function getRefundableTransactionOptions( Order $order ): array
     {
-        $options = [];
-
-        $formatter = Craft::$app->getFormatter();
         $transactions = RefundHelper::getRefundableTransactions($order);
+        $options = [];
 
         foreach ($transactions as $transaction)
         {
@@ -148,8 +146,6 @@ class OrderRefundsVariable extends Refunds
         $refundLineItems = $refund->getLineItems();
 
         $view = Craft::$app->getView();
-        $formatter = Craft::$app->getFormatter();
-        $currency = $refund->getTransactionCurrency();
 
         $cols = [
             'description' => [
