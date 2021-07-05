@@ -18,6 +18,7 @@ use yii\base\InvalidArgumentException;
 
 use Craft;
 use craft\helpers\ArrayHelper;
+use craft\helpers\Json as JsonHelper;
 
 use craft\commerce\Plugin as Commerce;
 use craft\commerce\records\Transaction as TransactionRecord;
@@ -412,7 +413,21 @@ class Refunds extends Component
         // @todo: Handle 'processing' and 'redirect' transaction statuses
         if ($transaction->status != TransactionRecord::STATUS_SUCCESS)
         {
-            $message = $transaction->message ? ': ('.$transaction->message.')' : '';
+            $message = $transaction->message;
+
+            // support message format in Paypal API response
+            if (empty($message))
+            {
+                $messageData = ArrayHelper::getValue($transaction->response, 'message');
+                if (!empty($messageData)) {
+                    $messageData = JsonHelper::decodeIfJson($messageData);
+                    $messageName = ArrayHelper::getValue($messageData, 'name');
+                    $message = ArrayHelper::getValue($messageData, 'message');
+                    $message = empty($messageName) ? $message : "$messageName: $message";
+                }
+            }
+
+            if(empty($message)) $message = ' ('.$message.')';
             throw new RefundException("Couldn’t refund transaction$message");
         }
 
