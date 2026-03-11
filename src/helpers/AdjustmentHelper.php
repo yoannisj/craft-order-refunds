@@ -71,7 +71,7 @@ class AdjustmentHelper
      * @return float
      */
 
-    public function lineItemTotalTaxableAdjustment( array $adjustments, sting $taxable, $lineItem ): float
+    public static function lineItemTotalTaxableAdjustment( array $adjustments, string $taxable, $lineItem ): float
     {
         $lineItemId = null;
 

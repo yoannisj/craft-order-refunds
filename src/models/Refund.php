@@ -451,6 +451,14 @@ class Refund extends Model
                 '{attribute} value `{value}` does not correspond with transaction.'));
         }
 
+        if (
+            $transaction && $parentTransaction
+            && $transaction->currency != $parentTransaction->currency
+        ) {
+            $validator->addError($this, $attribute, Craft::t('order-refunds',
+                'The refund transaction currency must be the same on the refund parent transaction.'));
+        }
+
         if ($orderId && $parentTransaction && $orderId != $parentTransaction->orderId)
         {
             $validator->addError($this, $attribute, Craft::t('order-refunds',
@@ -739,7 +747,6 @@ class Refund extends Model
      * 
      * @param Transaction|null $transaction
      */
-
     public function setTransaction( Transaction $transaction = null )
     {
         $this->transactionId = $transaction->id;
@@ -761,7 +768,6 @@ class Refund extends Model
     /**
      * @return Transaction \ null
      */
-
     public function getTransaction()
     {
         if (!isset($this->_transaction) && $this->transactionId)
@@ -914,10 +920,12 @@ class Refund extends Model
     /**
      * Returns the subtotal of line items covered by the refund
      * 
+     * @param bool $inPaymentCurrency
+     * 
      * @return float
      */
 
-    public function getItemSubtotal(): float
+    public function getItemSubtotal( bool $inPaymentCurrency = false ): float
     {
         $subtotal = 0;
 
@@ -925,7 +933,7 @@ class Refund extends Model
             $subtotal += $lineItem->getSubtotal();
         }
 
-        return $subtotal;
+        return $inPaymentCurrency ? $this->paymentAmount($subtotal) : $subtotal;
     }
 
     /**
@@ -968,7 +976,7 @@ class Refund extends Model
      * @return float
      */
 
-    public function getAdjustmentsTotal(): float
+    public function getAdjustmentsTotal( bool $inPaymentCurrency = false ): float
     {
         $total = 0;
 
@@ -979,16 +987,18 @@ class Refund extends Model
             }
         }
 
-        return $total;
+        return $inPaymentCurrency ? $this->paymentAmount($total) : $total;
     }
 
     /**
      * Returns total shipping cost covered by the refund
      * 
+     * @param bool $inPaymentCurrency
+     * 
      * @return float
      */
 
-    public function getTotalShippingCost(): float
+    public function getTotalShippingCost( bool $inPaymentCurrency = false ): float
     {
         $total = 0;
 
@@ -999,16 +1009,18 @@ class Refund extends Model
             }
         }
 
-        return $total;
+        return $inPaymentCurrency ? $this->paymentAmount($total) : $total;
     }
 
     /**
      * Returns total tax amount covered by the refund
      * 
+     * @param bool $inPaymentCurrency
+     * 
      * @return float
      */
 
-    public function getTotalTax(): float
+    public function getTotalTax( bool $inPaymentCurrency = false ): float
     {
         $total = 0;
 
@@ -1019,16 +1031,18 @@ class Refund extends Model
             }
         }
 
-        return $total;
+        return $inPaymentCurrency ? $this->paymentAmount($total) : $total;
     }
 
     /**
      * Returns total tax adjustment amount for the refund
      * 
+     * @param bool $inPaymentCurrency
+     * 
      * @return float
      */
 
-    public function getTotalTaxAdjustment(): float
+    public function getTotalTaxAdjustment( bool $inPaymentCurrency = false ): float
     {
         $total = 0;
 
@@ -1047,16 +1061,18 @@ class Refund extends Model
             }
         }
 
-        return $total;
+        return $inPaymentCurrency ? $this->paymentAmount($total) : $total;
     }
 
     /**
      * Returns total included tax amount covered by the refund
      * 
+     * @param bool $inPaymentCurrency
+     * 
      * @return float
      */
 
-    public function getTotalTaxIncluded(): float
+    public function getTotalTaxIncluded( bool $inPaymentCurrency = false ): float
     {
         $total = 0;
 
@@ -1067,16 +1083,18 @@ class Refund extends Model
             }
         }
 
-        return $total;
+        return $inPaymentCurrency ? $this->paymentAmount($total) : $total;
     }
 
     /**
      * Returns excluded tax amount
      * 
+     * @param bool $inPaymentCurrency
+     * 
      * @return float
      */
 
-    public function getTotalTaxExcluded(): float
+    public function getTotalTaxExcluded( bool $inPaymentCurrency = false ): float
     {
         $total = 0;
 
@@ -1086,30 +1104,55 @@ class Refund extends Model
                 $total += $adjustment->amount;
             }
         }
+        
+        return $inPaymentCurrency ? $this->paymentAmount($total) : $total;
+    }
 
-        return $total;
+    /**
+     * @param bool $inPaymentCurrency
+     * 
+     * @return float
+     */
+
+    public function getTotal( bool $inPaymentCurrency = false ): float
+    {
+        return ($this->getItemSubtotal($inPaymentCurrency) + $this->getAdjustmentsTotal($inPaymentCurrency));
     }
 
     /**
      * @return float
      */
 
-    public function getTotal(): float
+    public function getTotalPrice( bool $inPaymentCurrency = false ): float
     {
-        return ($this->getItemSubtotal() + $this->getAdjustmentsTotal());
-    }
-
-    /**
-     * @return float
-     */
-
-    public function getTotalPrice(): float
-    {
-        return $this->getTotal();
+        return $this->getTotal($inPaymentCurrency);
     }
 
     // =Protected Methods
     // =========================================================================
+
+    /**
+     * Converts given amount calculated from the order, into the refund currency. 
+     *
+     * @param float $amount 
+     *
+     * @return float
+     */
+    protected function paymentAmount( float $amount ): float
+    {
+        // Amounts are calculated in the order currency. 
+        $orderCurrency = $this->getOrder()?->currency;
+        $parentTransaction = $this->getParentTransaction();
+        $refundCurrency = $parentTransaction?->paymentCurrency;
+
+        $convertRate = 1;
+
+        if ($parentTransaction && $orderCurrency && $refundCurrency && $orderCurrency != $refundCurrency) {
+            $convertRate = $parentTransaction?->paymentRate ?? 1;
+        }
+
+        return CurrencyHelper::round($amount * $convertRate);
+    }
 
     /**
      * @return RefundLineItem[]
@@ -1222,10 +1265,9 @@ class Refund extends Model
         foreach ($order->getLineItems() as $lineItem)
         {
             $refundQty = ($lineItemsData[$lineItem->id]['qty'] ?? 0);
-
             if ($refundQty <= 0) continue;
 
-            $subtotal = $lineItem->salePrice * $refundQty;
+            $subtotal = $lineItem->price * $refundQty;
             $refundItemSubtotal += $subtotal;
             $refundItemSubtotals[$lineItem->id] = $subtotal;
         }

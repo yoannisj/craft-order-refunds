@@ -402,11 +402,24 @@ class Refunds extends Component
             );
         }
 
+        $refundAmount = $refund->getTotal(true);
+
+        // \Craft::dd([
+        //     'debug' => 'CREATE REFUND TRANSACTION',
+        //     'amount' => $refundAmount,
+        //     'paymentRate' => $refund->parentTransaction->paymentRate,
+        //     'order' => $refund->order?->shortNumber,
+        //     'orderCurrency' => $refund->order?->currency,
+        //     'orderPaymentCurrency' => $refund->order?->paymentCurrency,
+        //     'transactionCurrency' => $refund->parentTransaction?->currency,
+        //     'transactionPaymentCurrency' => $refund->parentTransaction?->paymentCurrency,
+        // ]);
+
         // Create Refund transaction and display result
         $transaction = Commerce::getInstance()->getPayments()
             ->refundTransaction(
                 $refund->getParentTransaction(),
-                $refund->getTotal(),
+                $refundAmount,
                 $refund->getNote()
             );
 
