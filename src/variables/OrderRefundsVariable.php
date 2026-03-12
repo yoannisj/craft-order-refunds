@@ -17,6 +17,7 @@ use craft\helpers\ArrayHelper;
 
 use craft\commerce\models\Transaction;
 use craft\commerce\elements\Order;
+use craft\commerce\helpers\Currency as CurrencyHelper;
 
 use yoannisj\orderrefunds\OrderRefunds;
 use yoannisj\orderrefunds\models\Refund;
@@ -145,6 +146,9 @@ class OrderRefundsVariable extends Refunds
         $orderLineItems = $order->getLineItems();
         $refundLineItems = $refund->getLineItems();
 
+        $currencyCode = $refund->getCurrencyCode();
+        $paymentRate = $refund->getPaymentRate();
+
         $view = Craft::$app->getView();
 
         $cols = [
@@ -227,9 +231,13 @@ class OrderRefundsVariable extends Refunds
                 ]);
             }
 
+            $salePrice = $lineItem->salePrice;
+            $paidPrice = $salePrice * $paymentRate;
+            $paidPriceAsCurrency = CurrencyHelper::formatAsCurrency($paidPrice, $currencyCode, false, true);
+
             $rows[$lineItemId] = [
                 'description' => $lineItem->description,
-                'salePrice' => $lineItem->salePriceAsCurrency,
+                'salePrice' => $paidPriceAsCurrency,
                 'qty' => $qtyHtml,
                 'restock' => $restockHtml,
             ];

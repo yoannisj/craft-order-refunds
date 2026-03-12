@@ -18,6 +18,9 @@
  # @since 0.1.0
  #}
 
+{% set currencyCode = refund.currencyCode %}
+{% set paymentRate = refund.paymentRate ?? 1 %}
+
 <article class="refund-editor refund">
     <header class="refund-header">
         <h3 class="refund-title">{{ refund.reference }}</h3>
@@ -65,7 +68,7 @@
                 <!-- =amount -->
                 <li class="refund-summary-amount">
                     <strong>{{ 'Refund Amount' | t('commerce') }}</strong>
-                    <br><span>{{ refund.transaction.amount | currency(refund.transaction.currency) }}</span>
+                    <br><span>{{ (refund.transaction.amount * paymentRate) | commerceCurrency(currencyCode) }}</span>
                 </li>
             </ul>
         </div>
